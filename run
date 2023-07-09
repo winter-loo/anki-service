@@ -1,0 +1,9 @@
+#!/bin/bash
+
+set -e
+
+export PYTHONWARNINGS=default
+export PYTHONPYCACHEPREFIX=out/pycache
+export ANKIDEV=1
+
+./ninja pylib/anki
