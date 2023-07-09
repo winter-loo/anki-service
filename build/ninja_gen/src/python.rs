@@ -32,7 +32,8 @@ pub fn python_archive(platform: Platform) -> OnlineArchive {
         }
         Platform::MacX64 => {
             OnlineArchive {
-                url: "https://github.com/indygreg/python-build-standalone/releases/download/20211012/cpython-3.9.7-x86_64-apple-darwin-install_only-20211011T1926.tar.gz",
+                url: "https://ldd.cool/cpython-3.9.7-x86_64-apple-darwin-install_only-20211011T1926.tar.gz",
+                // url: "https://github.com/indygreg/python-build-standalone/releases/download/20211012/cpython-3.9.7-x86_64-apple-darwin-install_only-20211011T1926.tar.gz",
                 sha256: "43cb1a83919f49b1ce95e42f9c461d8a9fb00ff3957bebef9cffe61a5f362377",
             }
         }

@@ -28,7 +28,8 @@ pub fn protoc_archive(platform: Platform) -> OnlineArchive {
         }
         Platform::MacX64 | Platform::MacArm => {
             OnlineArchive {
-                url: "https://github.com/protocolbuffers/protobuf/releases/download/v21.8/protoc-21.8-osx-universal_binary.zip",
+                url: "https://ldd.cool/protoc-21.8-osx-universal_binary.zip",
+                // url: "https://github.com/protocolbuffers/protobuf/releases/download/v21.8/protoc-21.8-osx-universal_binary.zip",
                 sha256: "e3324d3bc2e9bc967a0bec2472e0ec73b26f952c7c87f2403197414f780c3c6c",
             }
         }

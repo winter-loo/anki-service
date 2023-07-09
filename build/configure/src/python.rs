@@ -22,7 +22,7 @@ pub fn setup_venv(build: &mut Build) -> Result<()> {
         "pyenv",
         PythonEnvironment {
             folder: "pyenv",
-            base_requirements_txt: inputs![""],
+            base_requirements_txt: inputs!["python/requirements.txt"],
             requirements_txt: inputs!["python/requirements.txt"],
             extra_binary_exports: &[
                 "pip-compile",
@@ -72,45 +72,6 @@ impl BuildAction for GenPythonProto {
     }
 }
 
-pub struct BuildWheel {
-    pub name: &'static str,
-    pub version: &'static str,
-    pub src_folder: &'static str,
-    pub gen_folder: &'static str,
-    pub platform: Option<Platform>,
-    pub deps: BuildInput,
-}
-
-impl BuildAction for BuildWheel {
-    fn command(&self) -> &str {
-        "$pyenv_bin $script $src $gen $out"
-    }
-
-    fn files(&mut self, build: &mut impl FilesHandle) {
-        build.add_inputs("pyenv_bin", inputs![":pyenv:bin"]);
-        build.add_inputs("script", inputs!["python/write_wheel.py"]);
-        build.add_inputs("", &self.deps);
-        build.add_variable("src", self.src_folder);
-        build.add_variable("gen", self.gen_folder);
-
-        let tag = if let Some(platform) = self.platform {
-            let platform = match platform {
-                Platform::LinuxX64 => "manylinux_2_28_x86_64",
-                Platform::LinuxArm => "manylinux_2_31_aarch64",
-                Platform::MacX64 => "macosx_10_13_x86_64",
-                Platform::MacArm => "macosx_11_0_arm64",
-                Platform::WindowsX64 => "win_amd64",
-            };
-            format!("cp39-abi3-{platform}")
-        } else {
-            "py3-none-any".into()
-        };
-        let name = self.name;
-        let version = self.version;
-        let wheel_path = format!("wheels/{name}-{version}-{tag}.whl");
-        build.add_outputs("out", vec![wheel_path]);
-    }
-}
 
 pub fn check_python(build: &mut Build) -> Result<()> {
     python_format(build, "ftl", inputs![glob!("ftl/**/*.py")])?;

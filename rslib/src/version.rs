@@ -6,7 +6,7 @@ use std::env;
 use lazy_static::lazy_static;
 
 pub fn version() -> &'static str {
-    include_str!("../../.version").trim()
+    include_str!("../../VERSION").trim()
 }
 
 pub fn buildhash() -> &'static str {

@@ -2,7 +2,6 @@
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 use ninja_gen::action::BuildAction;
-use ninja_gen::archives::Platform;
 use ninja_gen::command::RunCommand;
 use ninja_gen::copy::LinkFile;
 use ninja_gen::glob;
