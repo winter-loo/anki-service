@@ -1,5 +1,5 @@
+from __future__ import annotations
 import sys
-
 from anki import _rsbridge, backend_pb2                          # noqa: E402
 from anki._backend_generated import RustBackendGenerated         # noqa: E402
 

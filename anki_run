@@ -1,5 +1,5 @@
-#!/bin/sh
+#!/bin/bash
 
-export PYTHONPATH=`pwd`/out/pylib:`pwd`/pylib
+export PYTHONPATH=$PWD/out/pylib:$PWD/pylib
 source out/pyenv/bin/activate
-python anki.py
+python main.py

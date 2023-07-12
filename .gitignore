@@ -10,3 +10,4 @@ target
 /windows.bazelrc
 /out
 node_modules
+/instance
