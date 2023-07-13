@@ -242,35 +242,8 @@ impl SchedulerService for Backend {
         input: pb::scheduler::GetQueuedCardsRequest,
     ) -> Result<pb::scheduler::QueuedCards> {
         self.with_col(|col| {
-            let rst = col
-                .get_queued_cards(input.fetch_limit as usize, input.intraday_learning_only)
-                .map(Into::into);
-
-            use std::fs::OpenOptions;
-            use std::io::Write;
-            use std::path::Path;
-            use std::time::{SystemTime, UNIX_EPOCH};
-
-            let since_the_epoch = SystemTime::now().duration_since(UNIX_EPOCH).expect("");
-            let now_ms = since_the_epoch.as_millis();
-            let log = format!(
-                "{:?} SCHEDULER.GetQueuedCards({:?})={:?}",
-                now_ms, input, rst
-            );
-
-            if Path::new("/Users/ldd/proj/rust/anki/action_study_now").exists() {
-                let mut log_file = OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open("service.log")
-                    .expect("Error opening file");
-                if let Err(err) = writeln!(log_file, "{}", log) {
-                    eprintln!("Error appending to file: {}", err);
-                } else {
-                    println!("string appended to file successfully");
-                }
-            }
-            rst
+            col.get_queued_cards(input.fetch_limit as usize, input.intraday_learning_only)
+                .map(Into::into)
         })
     }
 

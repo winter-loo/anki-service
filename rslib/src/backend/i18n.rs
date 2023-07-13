@@ -18,44 +18,16 @@ impl I18nService for Backend {
         &self,
         input: pb::i18n::TranslateStringRequest,
     ) -> Result<pb::generic::String> {
-        let input_str = format!("{:?}", input);
         let args = build_fluent_args(input.args);
 
-        let rst = Ok(self
+        Ok(self
             .tr
             .translate_via_index(
                 input.module_index as usize,
                 input.message_index as usize,
                 args,
             )
-            .into());
-
-        use std::fs::OpenOptions;
-        use std::io::Write;
-        use std::path::Path;
-        use std::time::{SystemTime, UNIX_EPOCH};
-
-        let since_the_epoch = SystemTime::now().duration_since(UNIX_EPOCH).expect("");
-        let now_ms = since_the_epoch.as_millis();
-        let log = format!(
-            "{:?} I18N.TranslateString({:?})={:?}",
-            now_ms, input_str, rst
-        );
-
-        if Path::new("/Users/ldd/proj/rust/anki/action_study_now").exists() {
-            let mut log_file = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("service.log")
-                .expect("Error opening file");
-            if let Err(err) = writeln!(log_file, "{}", log) {
-                eprintln!("Error appending to file: {}", err);
-            } else {
-                println!("string appended to file successfully");
-            }
-        }
-
-        rst
+            .into())
     }
 
     fn format_timespan(

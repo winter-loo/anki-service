@@ -68,31 +68,7 @@ impl NotesService for Backend {
 
     fn get_note(&self, input: pb::notes::NoteId) -> Result<pb::notes::Note> {
         let nid = input.into();
-        let rst = self.with_col(|col| col.storage.get_note(nid)?.or_not_found(nid).map(Into::into));
-
-        use std::fs::OpenOptions;
-        use std::io::Write;
-        use std::path::Path;
-        use std::time::{SystemTime, UNIX_EPOCH};
-
-        let since_the_epoch = SystemTime::now().duration_since(UNIX_EPOCH).expect("");
-        let now_ms = since_the_epoch.as_millis();
-        let log = format!("{:?} NOTES.GetNote({:?})={:?}", now_ms, nid, rst);
-
-        if Path::new("/Users/ldd/proj/rust/anki/action_study_now").exists() {
-            let mut log_file = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("service.log")
-                .expect("Error opening file");
-            if let Err(err) = writeln!(log_file, "{}", log) {
-                eprintln!("Error appending to file: {}", err);
-            } else {
-                println!("string appended to file successfully");
-            }
-        }
-
-        rst
+        self.with_col(|col| col.storage.get_note(nid)?.or_not_found(nid).map(Into::into))
     }
 
     fn remove_notes(

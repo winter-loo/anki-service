@@ -103,38 +103,11 @@ impl NotetypesService for Backend {
 
     fn get_notetype_legacy(&self, input: pb::notetypes::NotetypeId) -> Result<pb::generic::Json> {
         let ntid = input.into();
-        let rst = self.with_col(|col| {
+        self.with_col(|col| {
             let schema11: NotetypeSchema11 =
                 col.storage.get_notetype(ntid)?.or_not_found(ntid)?.into();
             Ok(serde_json::to_vec(&schema11)?).map(Into::into)
-        });
-
-        use std::fs::OpenOptions;
-        use std::io::Write;
-        use std::path::Path;
-        use std::time::{SystemTime, UNIX_EPOCH};
-
-        let since_the_epoch = SystemTime::now().duration_since(UNIX_EPOCH).expect("");
-        let now_ms = since_the_epoch.as_millis();
-        let log = format!(
-            "{:?} NOTETYPES.GetNotetypeLegacy({:?})={:?}",
-            now_ms, ntid, rst
-        );
-
-        if Path::new("/Users/ldd/proj/rust/anki/action_study_now").exists() {
-            let mut log_file = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("service.log")
-                .expect("Error opening file");
-            if let Err(err) = writeln!(log_file, "{}", log) {
-                eprintln!("Error appending to file: {}", err);
-            } else {
-                println!("string appended to file successfully");
-            }
-        }
-
-        rst
+        })
     }
 
     fn get_notetype_names(

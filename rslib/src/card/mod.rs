@@ -177,7 +177,6 @@ impl Card {
         }
         println!("");
 
-
         print!("old steps: ");
         for ns in old_steps.iter() {
             print!("{}", ns);

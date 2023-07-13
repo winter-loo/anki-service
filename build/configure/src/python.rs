@@ -71,7 +71,6 @@ impl BuildAction for GenPythonProto {
     }
 }
 
-
 pub fn check_python(build: &mut Build) -> Result<()> {
     python_format(build, "ftl", inputs![glob!("ftl/**/*.py")])?;
     python_format(build, "tools", inputs![glob!("tools/**/*.py")])?;
@@ -79,11 +78,7 @@ pub fn check_python(build: &mut Build) -> Result<()> {
     build.add(
         "check:mypy",
         PythonTypecheck {
-            folders: &[
-                "ftl",
-                "python",
-                "tools",
-            ],
+            folders: &["ftl", "python", "tools"],
             deps: inputs![glob!["{ftl}/**/*.{py,pyi}"]],
         },
     )?;

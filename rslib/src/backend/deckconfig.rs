@@ -49,39 +49,12 @@ impl DeckConfigService for Backend {
         &self,
         input: pb::deckconfig::DeckConfigId,
     ) -> Result<pb::generic::Json> {
-        let input_str = format!("{:?}", input);
-        let rst = self.with_col(|col| {
+        self.with_col(|col| {
             let conf = col.get_deck_config(input.into(), true)?.unwrap();
             let conf: DeckConfSchema11 = conf.into();
             Ok(serde_json::to_vec(&conf)?)
-        });
-
-        use std::fs::OpenOptions;
-        use std::io::Write;
-        use std::path::Path;
-        use std::time::{SystemTime, UNIX_EPOCH};
-
-        let since_the_epoch = SystemTime::now().duration_since(UNIX_EPOCH).expect("");
-        let now_ms = since_the_epoch.as_millis();
-        let log = format!(
-            "{:?} DECKCONFIG.GetDeckConfigLegacy({:?})={:?}",
-            now_ms, input_str, rst
-        );
-
-        if Path::new("/Users/ldd/proj/rust/anki/action_study_now").exists() {
-            let mut log_file = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("service.log")
-                .expect("Error opening file");
-            if let Err(err) = writeln!(log_file, "{}", log) {
-                eprintln!("Error appending to file: {}", err);
-            } else {
-                println!("string appended to file successfully");
-            }
-        }
-
-        rst.map(Into::into)
+        })
+        .map(Into::into)
     }
 
     fn new_deck_config_legacy(&self, _input: pb::generic::Empty) -> Result<pb::generic::Json> {

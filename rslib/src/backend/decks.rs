@@ -108,36 +108,12 @@ impl DecksService for Backend {
 
     fn get_deck_legacy(&self, input: pb::decks::DeckId) -> Result<pb::generic::Json> {
         let did = input.into();
-        let rst = self.with_col(|col| {
+        self.with_col(|col| {
             let deck: DeckSchema11 = col.storage.get_deck(did)?.or_not_found(did)?.into();
             serde_json::to_vec(&deck)
                 .map_err(Into::into)
                 .map(Into::into)
-        });
-
-        use std::fs::OpenOptions;
-        use std::io::Write;
-        use std::path::Path;
-        use std::time::{SystemTime, UNIX_EPOCH};
-
-        let since_the_epoch = SystemTime::now().duration_since(UNIX_EPOCH).expect("");
-        let now_ms = since_the_epoch.as_millis();
-        let log = format!("{:?} DECKS.GetDeckLegacy({:?})={:?}", now_ms, did, rst);
-
-        if Path::new("/Users/ldd/proj/rust/anki/action_study_now").exists() {
-            let mut log_file = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("service.log")
-                .expect("Error opening file");
-            if let Err(err) = writeln!(log_file, "{}", log) {
-                eprintln!("Error appending to file: {}", err);
-            } else {
-                println!("string appended to file successfully");
-            }
-        }
-
-        rst
+        })
     }
 
     fn get_deck_names(

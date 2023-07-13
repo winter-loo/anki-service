@@ -20,7 +20,6 @@ use rust::check_rust;
 
 use crate::proto::check_proto;
 
-
 fn main() -> Result<()> {
     let mut build = Build::new()?;
     let build = &mut build;

@@ -57,34 +57,6 @@ impl ConfigService for Backend {
     fn get_config_json(&self, input: pb::generic::String) -> Result<pb::generic::Json> {
         self.with_col(|col| {
             let val: Option<Value> = col.get_config_optional(input.val.as_str());
-
-            use std::fs::OpenOptions;
-            use std::io::Write;
-            use std::path::Path;
-            use std::time::{SystemTime, UNIX_EPOCH};
-
-            let since_the_epoch = SystemTime::now().duration_since(UNIX_EPOCH).expect("");
-            let now_ms = since_the_epoch.as_millis();
-            let log = format!(
-                "{:?} CONFIG.GetConfigJson({:?})={:?}",
-                now_ms,
-                input.val.as_str(),
-                val
-            );
-
-            if Path::new("/Users/ldd/proj/rust/anki/action_study_now").exists() {
-                let mut log_file = OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open("service.log")
-                    .expect("Error opening file");
-                if let Err(err) = writeln!(log_file, "{}", log) {
-                    eprintln!("Error appending to file: {}", err);
-                } else {
-                    println!("string appended to file successfully");
-                }
-            }
-
             val.or_not_found(input.val)
                 .and_then(|v| serde_json::to_vec(&v).map_err(Into::into))
                 .map(Into::into)
@@ -130,35 +102,11 @@ impl ConfigService for Backend {
         &self,
         input: pb::config::GetConfigBoolRequest,
     ) -> Result<pb::generic::Bool> {
-        let rst = self.with_col(|col| {
+        self.with_col(|col| {
             Ok(pb::generic::Bool {
                 val: col.get_config_bool(input.key().into()),
             })
-        });
-
-        use std::fs::OpenOptions;
-        use std::io::Write;
-        use std::path::Path;
-        use std::time::{SystemTime, UNIX_EPOCH};
-
-        let since_the_epoch = SystemTime::now().duration_since(UNIX_EPOCH).expect("");
-        let now_ms = since_the_epoch.as_millis();
-        let log = format!("{:?} CONFIG.GetConfigBool({:?})={:?}", now_ms, input, rst);
-
-        if Path::new("/Users/ldd/proj/rust/anki/action_study_now").exists() {
-            let mut log_file = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("service.log")
-                .expect("Error opening file");
-            if let Err(err) = writeln!(log_file, "{}", log) {
-                eprintln!("Error appending to file: {}", err);
-            } else {
-                println!("string appended to file successfully");
-            }
-        }
-
-        rst
+        })
     }
 
     fn set_config_bool(
