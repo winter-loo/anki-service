@@ -113,8 +113,11 @@ def get_input_assign(input_type):
     fields = sorted(input_type.fields, key=lambda x: x.number)
     return ", ".join(f"{f.name}={f.name}" for f in fields)
 
+g_service_name = ""
 
 def render_method(service_idx, method_idx, method):
+    global g_service_name
+    
     name = fix_snakecase(stringcase.snakecase(method.name))
     input_name = method.input_type.name
 
@@ -141,7 +144,9 @@ def render_method(service_idx, method_idx, method):
 
     buf = f"""\
     def {name}_raw(self, message: bytes) -> bytes:
-        return self._run_command({service_idx}, {method_idx}, message)
+        v = self._run_command({service_idx}, {method_idx}, message)
+        logging.info("{g_service_name}_raw.{name}(%s) = %s", str(message), str(v))
+        return v
 
 """
 
@@ -152,6 +157,7 @@ def render_method(service_idx, method_idx, method):
         raw_bytes = self._run_command({service_idx}, {method_idx}, message.SerializeToString())
         output = {fullname(method.output_type.full_name)}()
         output.ParseFromString(raw_bytes)
+        logging.info("{g_service_name}.{name}(%s) = %s", str(message), str(output))
         return output{single_attribute}
 
 """
@@ -165,6 +171,8 @@ out: list[str] = []
 def render_service(
     service: google.protobuf.descriptor.ServiceDescriptor, service_index: int
 ) -> None:
+    global g_service_name
+    g_service_name = service.name
     for method_index, method in enumerate(service.methods):
         out.append(render_method(service_index, method_index, method))
 
@@ -219,6 +227,7 @@ col.decks.all_config()
 
 from typing import *
 
+import logging
 import anki
 import anki.backend_pb2
 import anki.i18n_pb2
@@ -238,6 +247,8 @@ import anki.card_rendering_pb2
 import anki.tags_pb2
 import anki.media_pb2
 import anki.import_export_pb2
+
+logging.basicConfig(format="%(created)f %(message)s", level=logging.INFO, filename="rust_service.log")
 
 class RustBackendGenerated:
     def _run_command(self, service: int, method: int, input: Any) -> bytes:

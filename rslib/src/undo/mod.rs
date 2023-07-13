@@ -199,35 +199,11 @@ impl Collection {
     }
 
     pub fn undo_status(&self) -> UndoStatus {
-        let undo_ss = UndoStatus {
+        UndoStatus {
             undo: self.can_undo().cloned(),
             redo: self.can_redo().cloned(),
             last_step: self.state.undo.counter,
-        };
-
-        use std::fs::OpenOptions;
-        use std::io::Write;
-        use std::path::Path;
-        use std::time::{SystemTime, UNIX_EPOCH};
-
-        let since_the_epoch = SystemTime::now().duration_since(UNIX_EPOCH).expect("");
-        let now_ms = since_the_epoch.as_millis();
-        let log = format!("{:?} COLLECTION.GetUndoStatus()={:?}", now_ms, undo_ss);
-
-        if Path::new("/Users/ldd/proj/rust/anki/action_study_now").exists() {
-            let mut log_file = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("service.log")
-                .expect("Error opening file");
-            if let Err(err) = writeln!(log_file, "{}", log) {
-                eprintln!("Error appending to file: {}", err);
-            } else {
-                println!("string appended to file successfully");
-            }
         }
-
-        undo_ss
     }
 
     /// Merge multiple undoable operations into one, and return the union of

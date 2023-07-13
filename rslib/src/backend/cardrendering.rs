@@ -87,37 +87,10 @@ impl CardRenderingService for Backend {
         &self,
         input: pb::card_rendering::RenderExistingCardRequest,
     ) -> Result<pb::card_rendering::RenderCardResponse> {
-        let rst = self.with_col(|col| {
+        self.with_col(|col| {
             col.render_existing_card(CardId(input.card_id), input.browser)
                 .map(Into::into)
-        });
-
-        use std::fs::OpenOptions;
-        use std::io::Write;
-        use std::path::Path;
-        use std::time::{SystemTime, UNIX_EPOCH};
-
-        let since_the_epoch = SystemTime::now().duration_since(UNIX_EPOCH).expect("");
-        let now_ms = since_the_epoch.as_millis();
-        let log = format!(
-            "{:?} CARD_RENDERING.RenderExistingCard({:?})={:?}",
-            now_ms, input, rst
-        );
-
-        if Path::new("/Users/ldd/proj/rust/anki/action_study_now").exists() {
-            let mut log_file = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("service.log")
-                .expect("Error opening file");
-            if let Err(err) = writeln!(log_file, "{}", log) {
-                eprintln!("Error appending to file: {}", err);
-            } else {
-                println!("string appended to file successfully");
-            }
-        }
-
-        rst
+        })
     }
 
     fn render_uncommitted_card(
@@ -166,34 +139,7 @@ impl CardRenderingService for Backend {
     }
 
     fn encode_iri_paths(&self, input: pb::generic::String) -> Result<pb::generic::String> {
-        let rst = Ok(encode_iri_paths(&input.val).to_string().into());
-
-        use std::fs::OpenOptions;
-        use std::io::Write;
-        use std::path::Path;
-        use std::time::{SystemTime, UNIX_EPOCH};
-
-        let since_the_epoch = SystemTime::now().duration_since(UNIX_EPOCH).expect("");
-        let now_ms = since_the_epoch.as_millis();
-        let log = format!(
-            "{:?} CARD_RENDERING.EncodeIriPaths({:?})={:?}",
-            now_ms, input, rst
-        );
-
-        if Path::new("/Users/ldd/proj/rust/anki/action_study_now").exists() {
-            let mut log_file = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("service.log")
-                .expect("Error opening file");
-            if let Err(err) = writeln!(log_file, "{}", log) {
-                eprintln!("Error appending to file: {}", err);
-            } else {
-                println!("string appended to file successfully");
-            }
-        }
-
-        rst
+        Ok(encode_iri_paths(&input.val).to_string().into())
     }
 
     fn decode_iri_paths(&self, input: pb::generic::String) -> Result<pb::generic::String> {
