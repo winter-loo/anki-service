@@ -1,3 +1,11 @@
+1689206868.545233 DecksService.new_deck() = common {
+  study_collapsed: true
+  browser_collapsed: true
+}
+normal {
+  config_id: 1
+}
+
 1689206868.550766 DecksService.add_deck(name: "test2"
 common {
   study_collapsed: true
