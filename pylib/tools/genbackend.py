@@ -227,7 +227,6 @@ col.decks.all_config()
 
 from typing import *
 
-import logging
 import anki
 import anki.backend_pb2
 import anki.i18n_pb2
@@ -247,8 +246,14 @@ import anki.card_rendering_pb2
 import anki.tags_pb2
 import anki.media_pb2
 import anki.import_export_pb2
+import logging
+import os
 
-logging.basicConfig(format="%(created)f %(message)s", level=logging.INFO, filename="rust_service.log")
+LOG_SERVICE_CALLS = os.getenv("LOG_SERVICE_CALLS", "0") == "1"
+if LOG_SERVICE_CALLS:
+    logging.basicConfig(format="%(created)f %(message)s",
+                        level=logging.INFO,
+                        filename="rust_service.log")
 
 class RustBackendGenerated:
     def _run_command(self, service: int, method: int, input: Any) -> bytes:

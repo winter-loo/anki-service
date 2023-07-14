@@ -5,5 +5,6 @@ set -e
 export PYTHONWARNINGS=default
 export PYTHONPYCACHEPREFIX=out/pycache
 export ANKIDEV=1
+export LOG_SERVICE_CALLS=0
 
 ./ninja pylib/anki
