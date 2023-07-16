@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="layout flex flex-col h-screen">
+
+  <div class="flex flex-col h-1/4 p-4">
+
+    <div class="editor-area h-2/5">
+      <textarea class="w-full h-full"></textarea> 
+    </div>
+
+    <div class="bigger-editor h-3/5">
+      <textarea class="leading-tight w-full h-full"></textarea>
+    </div>
+
+  </div>  
+
+  <div class="flex flex-1">
+
+    <div class="notes w-2/5 p-4">
+
+      <h2 class="text-xl font-bold mb-2">Notes</h2>
+
+      <ol class="list-decimal list-inside">
+        <li>Note 1</li>
+        <li>Note 2</li>
+        <li>Note 3</li>
+      </ol>
+
+    </div>
+
+    <div class="w-3/5 p-4 flex items-center justify-center">
+    
+      <div class="card w-full h-full p-4 border relative">
+
+        <h2 class="text-lg absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">Hello</h2>
+
+        <div class="buttons absolute bottom-0 left-0 right-0 flex justify-between mt-4">
+        
+          <button class="btn px-4 py-2">
+            <span class="text-sm">1</span> 
+            <span>AGAIN</span>
+          </button>
+        
+          <button class="btn px-4 py-2">
+            <span class="text-sm">2</span>
+            <span>HARD</span> 
+          </button>
+        
+          <button class="btn px-4 py-2">
+            <span class="text-sm">3</span>
+            <span>GOOD</span>
+          </button>
+        
+          <button class="btn px-4 py-2">
+            <span class="text-sm">4</span>
+            <span>EASY</span>  
+          </button>
+        
+        </div>
+      
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+</body>
+<script src="app.js"></script>
+</html>

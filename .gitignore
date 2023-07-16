@@ -11,3 +11,5 @@ target
 /out
 node_modules
 /instance
+/rust_service.log
+/api_chain.txt

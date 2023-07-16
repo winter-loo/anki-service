@@ -1,0 +1,29 @@
+{
+  "name": "anykeeper",
+  "description": "keep anything to cloud for memory",
+  "version": "1.0",
+  "manifest_version": 3,
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "contextMenus",
+    "activeTab",
+    "scripting"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "/images/dnote_logo16.png",
+      "32": "/images/dnote_logo32.png",
+      "48": "/images/dnote_logo48.png",
+      "128": "/images/dnote_logo128.png"
+    }
+  },
+  "icons": {
+    "16": "/images/dnote_logo16.png",
+    "32": "/images/dnote_logo32.png",
+    "48": "/images/dnote_logo48.png",
+    "128": "/images/dnote_logo128.png"
+  }
+}

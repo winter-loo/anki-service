@@ -145,7 +145,7 @@ def render_method(service_idx, method_idx, method):
     buf = f"""\
     def {name}_raw(self, message: bytes) -> bytes:
         v = self._run_command({service_idx}, {method_idx}, message)
-        logging.info("{g_service_name}_raw.{name}(%s) = %s", str(message), str(v))
+        logging.info("{g_service_name}.{name}_raw(%s) = %s", str(message), str(v))
         return v
 
 """
