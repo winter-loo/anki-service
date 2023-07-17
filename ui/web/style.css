@@ -1,10 +1,10 @@
 /* styles.css */
 
-.editor-area {
+.main-note {
   @apply p-2 border;
 }
 
-.bigger-editor { 
+.sub-note { 
   @apply p-4 border;
 }
 
@@ -14,8 +14,8 @@
 
 /* Add borders */
 
-.editor-area,
-.bigger-editor {
+.main-note,
+.sub-note {
   border: 1px solid #ccc; 
 }
 
@@ -36,4 +36,14 @@
 
 .blink {
   animation: blink 0.5s linear forwards;
+}
+
+.hidden {
+  display: none;;
+}
+
+.keep-it-btn {
+  z-index: 10;
+  max-width: 8em;
+  background: rgba(0,255,0,.8);
 }

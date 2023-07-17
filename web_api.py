@@ -1,9 +1,10 @@
 from anki._backend import RustBackend
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles
 from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel
 import anki.search_pb2
+import json
 import os
 import time
 
@@ -168,6 +169,8 @@ def rating_from_ease(ease):
 @api_app.post("/card/answer/{ease}")
 def answer_card(ease: int):
     qcards = bk.get_queued_cards(fetch_limit=1, intraday_learning_only=False)
+    if len(qcards.cards) == 0:
+        return {}
     top_card = qcards.cards[0].card
     current_states = qcards.cards[0].states
     answer = build_answer(
@@ -178,6 +181,17 @@ def answer_card(ease: int):
 
     resp = bk.answer_card(answer)
     return MessageToDict(resp)
+
+
+@api_app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    while True:
+        data = await websocket.receive_text()
+        user_note = json.loads(data)
+        resp = create_note_by_json(NewUserNote(fields=user_note["fields"]))
+        note = read_note_by_id(resp["note_id"])
+        await websocket.send_text(json.dumps(note))
 
 
 app.mount("/api", api_app)
