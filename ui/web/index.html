@@ -10,7 +10,7 @@
 
 <body>
   <div class="layout flex flex-col h-screen">
-    <div class="w-full text-center f2">
+    <div class="w-full text-center">
       <h1 class="text-xl">Anki Lab</h1>
     </div>
 
@@ -28,9 +28,9 @@
         it</button>
     </div>
 
-    <div class="flex flex-1">
+    <div class="flex flex-1 flex-col md:flex-row">
 
-      <div class="notes w-2/5 p-4">
+      <div class="notes md:w-2/5 w-full p-4">
 
         <h2 class="text-xl font-bold mb-2">Notes</h2>
 
@@ -42,7 +42,7 @@
 
       </div>
 
-      <div class="w-3/5 p-4 flex items-center justify-center">
+      <div class="md:w-3/5 p-4 w-full aspect-square md:aspect-auto flex items-center justify-center">
 
         <div class="card w-full h-full p-4 border relative">
           <!-- refresh button -->
