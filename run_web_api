@@ -4,4 +4,4 @@ set -e
 
 export PYTHONPATH=$PWD/out/pylib:$PWD/pylib
 source out/pyenv/bin/activate
-uvicorn web_app_api:app --reload
+uvicorn web_api:app --reload

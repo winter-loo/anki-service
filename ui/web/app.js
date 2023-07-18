@@ -109,7 +109,7 @@ document.querySelectorAll('.btn').forEach(btn => {
 
 // Keypress listeners 
 document.addEventListener('keyup', async e => {
-  if(e.key >= 1 && e.key <= 4) {
+  if(!e.isContentEditable && e.key >= 1 && e.key <= 4) {
     const buttons = document.querySelectorAll('.btn');
     buttons[e.key-1].classList.remove('blink')
     blink(buttons[e.key-1]);
