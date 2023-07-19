@@ -46,8 +46,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         postText({
           fields: [
             info.selectionText,
-            sentence,
-            url
+            `[${sentence}](${url})`,
           ]
         });
       }
@@ -57,9 +56,9 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 const postText = json_obj => {
   console.log('post json: ', json_obj);
   (async () => {
-    const response = await fetch('https://ldd.cool:1500/api/note/add', {
+    const response = await fetch('http://ldd.cool:1500/api/note/add', {
       method: 'POST',
-      body: encodeURIComponent(JSON.stringify(json_obj)),
+      body: JSON.stringify(json_obj),
       headers: {
         'Content-Type': 'application/json'
       }

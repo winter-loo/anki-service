@@ -5,7 +5,7 @@ var memoListEl = document.getElementById("memo-list");
     li.setAttribute("id", "user-tip");
     li.textContent = "waiting...";
     memoListEl.appendChild(li); 
-    const response = await fetch('https://ldd.cool:1500/api/note/list', {
+    const response = await fetch('http://ldd.cool:1500/api/note/list', {
       method: 'GET',
     });
     response.json().then(j => ShowMemoList(j));
