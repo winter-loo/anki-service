@@ -1,8 +1,8 @@
 // Select ordered list element
 const noteListEl = document.querySelector('.notes ol');
 
-// Append note to list
-const appendNoteToList = (note) => {
+// prepend note to list
+const prependNoteToList = (note) => {
   const li = document.createElement('li');
   li.textContent = note.fields[0];
   li.classList = 'w-full bg-white hover:bg-gray-100 rounded-lg shadow-lg p-4 mb-6 relative';
@@ -46,7 +46,8 @@ const appendNoteToList = (note) => {
     li.appendChild(subnoteEl);
   });
 
-  noteListEl.appendChild(li);
+  // noteListEl.appendChild(li);
+  noteListEl.insertBefore(li, noteListEl.firstChild);
 }
 
 const list_notes = () => {
@@ -59,7 +60,7 @@ const list_notes = () => {
 
       // Loop through data and add to list
       data.forEach(item => {
-        appendNoteToList(item);
+        prependNoteToList(item);
       });
 
     })
@@ -99,9 +100,9 @@ const blink = (btn) => {
 }
 
 // Click event listeners
-document.querySelectorAll('.btn').forEach(btn => {
+document.querySelectorAll('.answer-btn').forEach(btn => {
   btn.addEventListener('click', async () => {
-    const number = btn.textContent[0]; 
+    const number = btn.querySelector('.shortcut').textContent;
     await fetch(`/api/card/answer/${number}`, { method: 'POST' });
     show_next_card();
   });
@@ -109,16 +110,55 @@ document.querySelectorAll('.btn').forEach(btn => {
 
 // Keypress listeners 
 document.addEventListener('keyup', async e => {
-  if(!e.isContentEditable && e.key >= 1 && e.key <= 4) {
-    const buttons = document.querySelectorAll('.btn');
+  const not_in_insert_mode = e.target.tagName !== "INPUT" &&
+                              e.target.tagName !== "TEXTAREA" &&
+                              !e.isContentEditable;
+  if(not_in_insert_mode && e.key >= 1 && e.key <= 4) {
+    const buttons = document.querySelectorAll('.answer-btn');
     buttons[e.key-1].classList.remove('blink')
     blink(buttons[e.key-1]);
 
     await fetch(`/api/card/answer/${e.key}`, { method: 'POST' });
     show_next_card();
-  }  
+  }
 });
 
+// Get textarea elements
+const mainNote = document.querySelector('.main-note textarea');
+const subNote = document.querySelector('.sub-note textarea');
+
+
+// Submit handler
+const addNote = async () => {
+  if(mainNote.value.trim() == '') {
+    return;
+  }
+  var note = {
+    fields: [
+      mainNote.value,
+      subNote.value
+    ]
+  };
+  const res = await fetch('/api/note/add', {
+    method: 'POST',
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(note)
+  });
+  const data = await res.json();
+  note.id = data["note_id"];
+  prependNoteToList(note);
+}
+
+// Shortcut key
+document.addEventListener('keydown', e => {
+  if(e.key === 'Enter' && e.shiftKey) {
+    e.preventDefault();
+    blink(document.querySelector('.keep-it-btn'));
+    addNote();
+  }
+});
 
 // Get textarea and container elements
 const mainNoteEl = document.querySelector('.main-note textarea');
@@ -132,67 +172,10 @@ mainNoteEl.addEventListener('input', () => {
     keepItBtn.classList.remove('hidden');
   }
 });
+keepItBtn.addEventListener('click', addNote);
 
-// Get textarea elements
-const mainNote = document.querySelector('.main-note textarea');
-const subNote = document.querySelector('.sub-note textarea');
-
-var ws = undefined;
-var ws_connected = false;
-
-const addNote = () => {
-  if (ws_connected == false) {
-    ws = new WebSocket('ws://localhost:8000/api/ws');
-    ws.onopen = () => {
-      console.log('WebSocket Client Connected');
-      ws.send(JSON.stringify({
-        fields: [
-          mainNote.value,
-          subNote.value
-        ]
-      }));
-      ws_connected = true;
-    };
-    ws.onmessage = (event) => {
-      appendNoteToList(JSON.parse(event.data));
-    };
-    ws.onclose = () => {
-      console.log('WebSocket Client Disconnected');
-      ws = undefined;
-      ws_connected = false;
-    }
-  } else {
-    ws.send(JSON.stringify({
-      fields: [
-        mainNote.value,
-        subNote.value
-      ]
-    }));
+document.querySelector('.note-list-refresh-btn').addEventListener('click',
+  () => {
+    list_notes();
   }
-}
-
-// Submit handler
-const submitNote = () => {
-  if(mainNote.value.trim() !== '') {
-    fetch('/api/note/add', {
-      method: 'POST',
-      body: JSON.stringify({
-        fields: [
-          mainNote.value,
-          subNote.value  
-        ]
-      })
-    });
-  }
-}
-
-// Submit button click
-document.querySelector('.keep-it-btn').addEventListener('click', addNote);
-
-// Shortcut key
-document.addEventListener('keydown', e => {
-  if(e.key === 'Enter' && e.shiftKey) {
-    blink(document.querySelector('.keep-it-btn'));
-    addNote();
-  }
-});
+);

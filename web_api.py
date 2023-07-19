@@ -7,6 +7,8 @@ import anki.search_pb2
 import json
 import os
 import time
+import logging
+
 
 try:
     os.mkdir('instance')
@@ -181,17 +183,6 @@ def answer_card(ease: int):
 
     resp = bk.answer_card(answer)
     return MessageToDict(resp)
-
-
-@api_app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    while True:
-        data = await websocket.receive_text()
-        user_note = json.loads(data)
-        resp = create_note_by_json(NewUserNote(fields=user_note["fields"]))
-        note = read_note_by_id(resp["note_id"])
-        await websocket.send_text(json.dumps(note))
 
 
 app.mount("/api", api_app)
