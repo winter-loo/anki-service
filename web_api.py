@@ -1,5 +1,6 @@
 from anki._backend import RustBackend
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel
@@ -25,6 +26,21 @@ bk.open_collection(collection_path='instance/collection.anki2',
 
 api_app = FastAPI(title="Anki Web API")
 app = FastAPI(title="main app")
+
+
+# Set up CORS middleware
+origins = [
+    "chrome-extension://oglpjlknjdpkmcajnopbkafkdbieolpj",
+    # Add more origins as needed
+]
+
+api_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class NewUserNote(BaseModel):
