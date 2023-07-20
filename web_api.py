@@ -30,8 +30,12 @@ app = FastAPI(title="main app")
 
 # Set up CORS middleware
 origins = [
+    # local unpack extension on Mac
     "chrome-extension://oglpjlknjdpkmcajnopbkafkdbieolpj",
-    # Add more origins as needed
+    # local unpack extension on Windows 10
+    "chrome-extension://cgpacffgcnipbjkapappdlceacpgikpo",
+    # chrome web store extension id
+    "chrome-extension://gcgjhmoegecipjkgpkddhobjfjnagoco",
 ]
 
 api_app.add_middleware(
