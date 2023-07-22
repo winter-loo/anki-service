@@ -142,22 +142,28 @@ list_notes();
 
 async function showNextCard() {
   // Select heading element
-  const headingEl = cardEl.querySelector('h2');
+  const frontEl = cardEl.querySelector('.front');
+  const backEl = cardEl.querySelector('.back');
+  frontEl.classList.remove('h-1/3');
+  frontEl.classList.add('h-full');
+  backEl.classList.remove('h-2/3');
+  backEl.classList.add('h-0');
 
   const res = await fetch('/api/card/next');
   const data = await res.json();
   if (data.cards == undefined || data.cards.length == 0) {
     cardEl.dataset.cardId = '';
     cardEl.dataset.noteId = '';
-    headingEl.innerHTML = "Congratulations!<br />You've finished all the cards!";
+    frontEl.innerHTML = "Congratulations!<br />You've finished all the cards!";
     return;
   }
   const top_card = data.cards[0].card;
   const noteRes = await fetch(`/api/note/@${top_card.noteId}`);
   const note = await noteRes.json();
-  headingEl.textContent = note.fields[0];
   cardEl.dataset.cardId = top_card.id;
   cardEl.dataset.noteId = top_card.noteId;
+  frontEl.querySelector('span').textContent = note.fields[0];
+  backEl.querySelector('span').textContent = note.fields[1];
 }
 showNextCard();
 
@@ -297,3 +303,24 @@ document.querySelector('.note-list-reload-btn').addEventListener('click',
     e.target.disabled = false;
   }
 );
+
+var cardFrontEl = cardEl.querySelector('.front');
+var cardBackEl = cardEl.querySelector('.back');
+
+cardFrontEl.querySelector('span').addEventListener('click', (e) => {
+    e.stopPropagation();
+});
+
+cardBackEl.querySelector('span').addEventListener('click', (e) => {
+  e.stopPropagation();
+});
+
+cardEl.addEventListener('click', () => {
+  const note = cacheGetNote(cardEl.dataset.noteId);
+  if (note != undefined && note.fields[1] != '') {
+    cardFrontEl.classList.toggle('h-1/3');
+    cardFrontEl.classList.toggle('h-full');
+    cardBackEl.classList.toggle('h-2/3');
+    cardBackEl.classList.toggle('h-0');
+  }
+});

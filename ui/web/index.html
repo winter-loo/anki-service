@@ -30,8 +30,9 @@
     <div class="flex flex-1 flex-col md:flex-row p-4">
       <!-- begin the first column -->
       <div class="md:w-3/5 w-full aspect-square md:aspect-auto flex flex-col relative border">
-        <div class="card w-full h-full p-4 relative">
-          <h2 class="text-[var(--deep-sky-blue)] text-[2rem] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">Hello</h2>
+        <div class="card w-full h-full p-4 relative flex flex-col items-center justify-center">
+          <h2 class="front text-[var(--deep-sky-blue)] text-[2rem] text-center h-full transition-height flex items-center justify-center"><span class="p-2">Hello</span></h2>
+          <p class="back h-0 transition-height overflow-hidden"><span class="p-2">你好</span></p>
         </div>
         <div class="answer-btns flex justify-between">
           <button class="answer-btn px-4 py-2 bg-[var(--steel-blue)] hover:bg-blue-700 active:bg-blue-800 text-[var(--off-white)]">
