@@ -2,6 +2,20 @@
 
 set -e
 
+if [ -z $(command -v python3) ]; then
+  echo "install python first, version >= 3.10"
+  exit 1
+fi
+
+python_major_version=$(python3 --version | awk -F'[ |.]' '{print $2}')
+python_minor_version=$(python3 --version | awk -F'[ |.]' '{print $3}')
+
+if [ $python_major_version -ne 3 ] || [ $python_minor_version -lt 10 ]; then
+  echo "install python first, version >= 3.10"
+  exit 1
+fi
+
+export PYTHON_BINARY=$(command -v python3)
 export PYTHONWARNINGS=default
 export PYTHONPYCACHEPREFIX=out/pycache
 export ANKIDEV=1

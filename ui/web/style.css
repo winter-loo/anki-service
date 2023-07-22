@@ -1,7 +1,16 @@
-/* styles.css */
+:root {
+  --sky-blue: #87ceeb;
+  --steel-blue: #4682b4;
+  --deep-sky-blue: #5cacee;
+  --light-gray: #f5f5f5;
+  --off-white: #fafafa;
+  --light-cream: #fdf4e6;
+  --pale-blue: #e6f7ff;
+}
+
 @keyframes blink {
   50% {
-    background: red;
+    background: var(--deep-sky-blue);
   }
 }
 
@@ -10,13 +19,12 @@
 }
 
 .hidden {
-  display: none;;
+  display: none;
 }
 
-.keep-it-btn {
+.save-update-btn {
   z-index: 10;
   max-width: 8em;
-  background: rgba(0,255,0,.8);
 }
 
 @media (min-width: 768px) {
@@ -39,4 +47,14 @@
 /* Handle on hover */
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+
+.note-list-reload-btn:active svg {
+  animation: rotate 0.5s linear infinite;
+}
+
+@keyframes rotate {
+  100% { 
+    transform: rotate(-360deg); 
+  }
 }

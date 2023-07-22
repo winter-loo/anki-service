@@ -47,15 +47,8 @@ api_app.add_middleware(
 )
 
 
-class NewUserNote(BaseModel):
+class UserNote(BaseModel):
     fields: list[str]
-
-
-class UserNoteUpdate(BaseModel):
-    # field_index: int | None
-    # field_value: str
-    # when field_index is None, add a new field
-    fields: list[tuple[int | None, str]]
 
 
 @api_app.get("/note/list")
@@ -84,7 +77,7 @@ def create_note(fld: str):
 
 
 @api_app.post("/note/add")
-def create_note_by_json(new_user_note: NewUserNote):
+def create_note_by_json(new_user_note: UserNote):
     basic_notetype = bk.get_notetype_names()[0]
     nn = bk.new_note(basic_notetype.id)
     # RustBackend.new_note() returns a Note object with two fields
@@ -97,17 +90,11 @@ def create_note_by_json(new_user_note: NewUserNote):
     return {"note_id": resp.note_id}
 
 
-@api_app.post("/note/update/{note_id}")
-def update_note_by_id(note_id: int, user_note: UserNoteUpdate):
+@api_app.post("/note/update/@{note_id}")
+def update_note_by_id(note_id: int, user_note: UserNote):
     note = bk.get_note(note_id)
-    for update_fld in user_note.fields:
-        if update_fld[0] is None:
-            pass
-            # RustBackend does not allow adding new fields
-            # note.fields.append(update_fld[1])
-        else:
-            if update_fld[0] == 0 or update_fld[0] == 1:
-                note.fields[update_fld[0]] = update_fld[1]
+    note.fields[0] = user_note.fields[0]
+    note.fields[1] = user_note.fields[1]
     resp = bk.update_notes(notes=[note], skip_undo_entry=True)
     return MessageToDict(resp)
 
