@@ -1,7 +1,7 @@
 {
-  "name": "anykeeper",
-  "description": "keep anything to cloud for memory",
-  "version": "1.0",
+  "name": "dnote",
+  "description": "upload notes to cloud for better memorizing",
+  "version": "0.0.1",
   "manifest_version": 3,
   "background": {
     "service_worker": "background.js"
