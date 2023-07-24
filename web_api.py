@@ -33,7 +33,7 @@ origins = [
     # local unpack extension on Mac
     "chrome-extension://oglpjlknjdpkmcajnopbkafkdbieolpj",
     # local unpack extension on Windows 10
-    "chrome-extension://cgpacffgcnipbjkapappdlceacpgikpo",
+    "chrome-extension://ajaafalcmjeakneghkgaklhnhbaphaai",
     # chrome web store extension id
     "chrome-extension://gcgjhmoegecipjkgpkddhobjfjnagoco",
 ]
