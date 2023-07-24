@@ -1,11 +1,50 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <!-- <link rel="stylesheet" href="button.css"> -->
-  </head>
-  <body>
-    <h1>memo list</h1>
-    <ul id="memo-list"></ul>
-    <script src="popup.js"></script>
-  </body>
+
+<head>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <div>
+    <div class="border-b border-gray-200 dark:border-gray-700 mb-4">
+      <ul class="flex flex-wrap -mb-px" id="myTab" data-tabs-toggle="#myTabContent" role="tablist">
+        <li class="mr-2" role="presentation">
+          <button
+            class="inline-block text-gray-500 hover:text-gray-600 hover:border-gray-300 rounded-t-lg py-4 px-4 text-sm font-medium text-center border-transparent border-b-2 dark:text-gray-400 dark:hover:text-gray-300"
+            id="editor-tab" data-tabs-target="#editor" type="button" role="tab" aria-controls="editor"
+            aria-selected="false">editor</button>
+        </li>
+        <li class="mr-2" role="presentation">
+          <button
+            class="inline-block text-gray-500 hover:text-gray-600 hover:border-gray-300 rounded-t-lg py-4 px-4 text-sm font-medium text-center border-transparent border-b-2 dark:text-gray-400 dark:hover:text-gray-300"
+            id="card-tab" data-tabs-target="#card" type="button" role="tab" aria-controls="card"
+            aria-selected="false">card</button>
+        </li>
+        <li class="mr-2" role="presentation">
+          <button
+            class="active inline-block text-gray-500 hover:text-gray-600 hover:border-gray-300 rounded-t-lg py-4 px-4 text-sm font-medium text-center border-transparent border-b-2 dark:text-gray-400 dark:hover:text-gray-300"
+            id="notes-tab" data-tabs-target="#notes" type="button" role="tab" aria-controls="notes"
+            aria-selected="true">notes</button>
+        </li>
+      </ul>
+    </div>
+    <div id="myTabContent">
+      <div class="p-4 hidden" id="editor" role="tabpanel" aria-labelledby="editor-tab">
+        <h1>editor</h1>
+      </div>
+      <div class="p-4 hidden" id="card" role="tabpanel" aria-labelledby="card-tab">
+        <h1>card</h1>
+      </div>
+      <div class="p-4" id="notes" role="tabpanel" aria-labelledby="notes-tab">
+        <ol class="list-decimal list-inside max-h-full overflow-auto overscroll-contain"></ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- trigger tailwindcss classes used in js -->
+  <ul style="display: none;"><li class="w-full bg-white hover:bg-gray-100 rounded-lg shadow-lg p-4 mb-6 relative"></li></ul>
+</body>
+<script src="popup.js"></script>
+
 </html>

@@ -1,23 +1,23 @@
-var memoListEl = document.getElementById("memo-list");
+var noteListEl = document.querySelector("#notes ol");
 
 (async () => {
-    var li = document.createElement('li');
-    li.setAttribute("id", "user-tip");
-    li.textContent = "waiting...";
-    memoListEl.appendChild(li); 
-    const response = await fetch('http://ldd.cool:1500/api/note/list', {
+    var url = 'http://ldd.cool:1500/api/note/list';
+    if (window.location.hostname.indexOf('localhost') != -1) {
+        url = 'http://localhost:8000/api/note/list';
+    }
+    const response = await fetch(url, {
       method: 'GET',
     });
-    response.json().then(j => ShowMemoList(j));
+    const data = await response.json();
+    ShowMemoList(data);
 })();
 
 function ShowMemoList(json_obj) {
-    var userTipEl = document.getElementById('user-tip');
-    memoListEl.removeChild(userTipEl);
     var notes = json_obj;
     for (var i = 0; i < notes.length; i++) {
         var li = document.createElement('li');
+        li.classList = 'w-full bg-white hover:bg-gray-100 rounded-lg shadow-lg p-4 mb-6 relative';
         li.textContent = notes[i]['fields'][0];
-        memoListEl.appendChild(li); 
+        noteListEl.appendChild(li); 
     }
 }
