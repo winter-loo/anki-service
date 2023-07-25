@@ -6,8 +6,8 @@
 </head>
 
 <body>
-  <div class="container">
-    <div class="border-b border-gray-200 dark:border-gray-700 mb-4">
+  <div class="layout h-screen flex flex-col">
+    <div class="h-14 border-b border-gray-200 dark:border-gray-700">
       <ul class="flex -mb-px" id="myTab" data-tabs-toggle="#myTabContent" role="tablist">
         <li class="mr-2" role="presentation">
           <button
@@ -29,15 +29,45 @@
         </li>
       </ul>
     </div>
-    <div id="myTabContent">
-      <div class="p-4 hidden" id="editor" role="tabpanel" aria-labelledby="editor-tab">
-        <h1>editor</h1>
+    <div id="myTabContent" class="flex-grow overflow-hidden">
+      <div class="flex flex-col p-4 h-full hidden" id="editor" role="tabpanel" aria-labelledby="editor-tab">
+        <div class="main-note w-full">
+          <input type="text" name="content" placeholder="main note" class="pl-1 w-full leading-10">
+        </div>
+        <div class="sub-note flex-grow w-full mt-2">
+          <textarea name="content" placeholder="your understanding" class="p-1 h-full w-full"></textarea>
+        </div>
       </div>
-      <div class="p-4 hidden" id="card" role="tabpanel" aria-labelledby="card-tab">
-        <h1>card</h1>
+      <div class="flex flex-col p-4 h-full hidden" id="card" role="tabpanel" aria-labelledby="card-tab">
+        <div class="card-content flex-grow p-4 relative flex flex-col items-center justify-center">
+          <h2 class="front text-[2rem] text-center h-full transition-height flex items-center justify-center"><span class="p-2">Hello</span></h2>
+          <p class="back h-0 transition-height overflow-hidden"><span class="p-2">你好</span></p>
+        </div>
+        <div class="answer-btns flex justify-between">
+          <button class="answer-btn px-4 py-2">
+            <span class="shortcut text-sm">1</span>
+            <span>AGAIN</span>
+          </button>
+
+          <button class="answer-btn px-4 py-2">
+            <span class="shortcut text-sm">2</span>
+            <span>HARD</span>
+          </button>
+
+          <button class="answer-btn px-4 py-2">
+            <span class="shortcut text-sm">3</span>
+            <span>GOOD</span>
+          </button>
+
+          <button class="answer-btn px-4 py-2">
+            <span class="shortcut text-sm">4</span>
+            <span>EASY</span>
+          </button>
+        </div>
       </div>
-      <div class="p-4" id="notes" role="tabpanel" aria-labelledby="notes-tab">
-        <ol class="list-decimal list-inside max-h-full overflow-auto overscroll-contain"></ol>
+
+      <div class="p-4 max-h-full overflow-auto overscroll-contain" id="notes" role="tabpanel" aria-labelledby="notes-tab">
+        <ol class="list-decimal list-inside "></ol>
       </div>
     </div>
   </div>

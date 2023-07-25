@@ -2,7 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-[role=tab].active {
+[role=tab].active,
+[role=tab].active:hover,
+[role=tab].active:focus {
     border-color: #4682b4;
     color: #4682b4;
 }
+
