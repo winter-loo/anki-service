@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+.layout {
+    min-width: 400px;
+    min-height: 400px;
+}
+
 [role=tab].active,
 [role=tab].active:hover,
 [role=tab].active:focus {
