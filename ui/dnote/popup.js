@@ -1,10 +1,13 @@
 var noteListEl = document.querySelector("#notes ol");
+var cardEl = document.querySelector('#card .card-content');
+
+var api_svc = 'http://ldd.cool:1500/api';
+if (window.location.hostname.indexOf('localhost') != -1 || window.location.hostname.indexOf('127.0.0.1') != -1) {
+    api_svc = 'http://localhost:8000/api';
+}
 
 (async () => {
-    var url = 'http://ldd.cool:1500/api/note/list';
-    if (window.location.hostname.indexOf('localhost') != -1 || window.location.hostname.indexOf('127.0.0.1') != -1) {
-        url = 'http://localhost:8000/api/note/list';
-    }
+    var url = `${api_svc}/note/list`;
     const response = await fetch(url, {
         method: 'GET',
     });
@@ -18,7 +21,7 @@ function ShowMemoList(json_obj) {
         var li = document.createElement('li');
         li.classList = 'w-full bg-white hover:bg-gray-100 rounded-lg shadow-lg p-4 mb-6 relative';
         li.textContent = notes[i]['fields'][0];
-        noteListEl.appendChild(li);
+        noteListEl.insertBefore(li, noteListEl.firstChild);
     }
 }
 
@@ -41,6 +44,33 @@ tabButtonEls.forEach((el) => {
     el.addEventListener('click', function () {
         setTabActive(el);
     });
-}); 
+});
 
-setTabActive(tabButtonEls[2]);
+setTabActive(tabButtonEls[1]);
+
+async function showNextCard() {
+    // Select heading element
+    const frontEl = cardEl.querySelector('.front');
+    const backEl = cardEl.querySelector('.back');
+    frontEl.classList.remove('h-1/3');
+    frontEl.classList.add('h-full');
+    backEl.classList.remove('h-2/3');
+    backEl.classList.add('h-0');
+
+    const res = await fetch(`${api_svc}/card/next`);
+    const data = await res.json();
+    if (data.cards == undefined || data.cards.length == 0) {
+        cardEl.dataset.cardId = '';
+        cardEl.dataset.noteId = '';
+        frontEl.innerHTML = "Congratulations!<br />You've finished all the cards!";
+        return;
+    }
+    const top_card = data.cards[0].card;
+    const noteRes = await fetch(`${api_svc}/note/@${top_card.noteId}`);
+    const note = await noteRes.json();
+    cardEl.dataset.cardId = top_card.id;
+    cardEl.dataset.noteId = top_card.noteId;
+    frontEl.querySelector('span').textContent = note.fields[0];
+    backEl.querySelector('span').textContent = note.fields[1];
+}
+showNextCard();
