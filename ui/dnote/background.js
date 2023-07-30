@@ -6,63 +6,124 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+const fetchApiKey = async () => {
+  const response = await fetch('https://chat.openai.com/api/auth/session', {
+    method: "GET",
+    headers: {
+      "Origin": "",
+      "Referer": ""
+    }
+  });
+  const data = await response.json();
+  return data.accessToken;
+};
 
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  console.log('menu item clicked: ', info);
+let apiKey = "";
+const fetchAiNotes = async (text, onMessage) => {
+  const fetchSSE = async () => {
+    if (apiKey === '') {
+      apiKey = await fetchApiKey();
+    }
+    const payload = {
+      "action": "next",
+      "messages": [
+        {
+          "id": "859f89e4-ccfa-4b9e-92b3-61ff30f4bc02",
+          "role": "user",
+          "content": {
+            "content_type": "text",
+            "parts": [
+              `translate the following English text to Chinese: ${text}`
+            ]
+          }
+        }
+      ],
+      "model": "gpt-3.5-turbo",
+      "parent_message_id": "bf843341-c16e-477e-abbc-f18e47fb40a6",
+      "history_and_training_disabled": true
+    };
 
-  const { id, url } = tab;
-  chrome.scripting.executeScript({
-    target: { tabId: id, allFrames: true },
-    func: () => {
-      // 获取选中文本
-      var selectedText = window.getSelection().getRangeAt(0).toString();
+    const jsonData = JSON.stringify(payload);
 
-      // 获取选中文本所在的最近公共祖先元素
-      var commonAncestor = window.getSelection().getRangeAt(0).commonAncestorContainer;
+    try {
+      const response = await fetch('https://chat.openai.com/backend-api/conversation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + apiKey,
+        },
+        body: jsonData,
+      });
 
-      // 获取公共祖先元素的文本内容
-      var ancestorText = commonAncestor.textContent || commonAncestor.innerText;
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
 
-      // 查找包含所选单词的句子
-      var sentences = ancestorText.split(/[.!?]/g);
-      var selectedSentence = '';
-      for (var i = 0; i < sentences.length; i++) {
-        if (sentences[i].indexOf(selectedText) >= 0) {
-          selectedSentence = sentences[i];
-          break;
+      const stream = response.body; // Get the response body as a ReadableStream
+      const reader = stream.getReader();
+
+      async function processStreamData() {
+        while (true) {
+          try {
+            const { done, value } = await reader.read();
+
+            if (done) {
+              console.log('Stream finished.');
+              break;
+            }
+
+            const eventData = new TextDecoder().decode(value)
+            // console.log('Received event data:', eventData);
+
+            // Split the event data by newlines to get individual events
+            const events = eventData.trim().split('\n\n');
+
+            // Process each event
+            events.forEach((event) => {
+              const jsonData = event.substring("data: ".length);
+              // console.log(jsonData);
+              if (jsonData != "[DONE]") {
+                let msg = JSON.parse(jsonData);
+                console.log('Received JSON msg:', msg);
+
+                if (msg.message && msg.message.author.role == 'assistant' &&
+                  msg.message.content.content_type == 'text') {
+                  let msgContent = msg.message.content;
+                  onMessage(msgContent.parts.join(' '));
+                }
+              }
+            });
+
+          } catch (error) {
+            console.error('Error reading stream:', error);
+          }
         }
       }
 
-      // 输出包含所选单词的句子
-      console.log(selectedSentence);
-      // TODO: 当前选中的句子并不一定是一个有效的句子。当选中的文本所在的句子含有
-      // 其他类型的节点（如，<a>, <pre>）时，`ancestorText` 并不包含完整的句子。
-      return selectedSentence.trim();
+      // Start processing the incoming stream of messages
+      await processStreamData();
+    } catch (error) {
+      console.error('Error sending the POST request:', error);
     }
-  })
-    .then(injectionResults => {
-      sentence = injectionResults[0].result;
-      if (info.menuItemId == 'chrome.ext.ldd.cool') {
-        postText({
-          fields: [
-            info.selectionText,
-            `[${sentence}](${url})`,
-          ]
-        });
-      }
-    });
-});
+  }
 
-const postText = json_obj => {
-  console.log('post json: ', json_obj);
-  (async () => {
-    const response = await fetch('http://ldd.cool:1500/api/note/add', {
-      method: 'POST',
-      body: JSON.stringify(json_obj),
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    response.json().then(j => console.log(j));
-  })();
+  fetchSSE();
 }
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  console.log('menu item clicked: ', info);
+
+  chrome.tabs.sendMessage(tab.id, {
+    type: 'open-dnote-editor',
+    info,
+  });
+
+  fetchAiNotes(info.selectionText, (aiNote) => {
+    chrome.tabs.sendMessage(tab.id, {
+      type: 'ai-note',
+      text: aiNote
+    });
+  });
+
+
+});

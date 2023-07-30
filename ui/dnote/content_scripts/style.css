@@ -1,0 +1,8 @@
+#dnote-extension-root {
+    position: fixed;
+    top: 0;
+    right: 0;
+    background-color: bisque;
+    display: none;
+    z-index: 99999999;
+}

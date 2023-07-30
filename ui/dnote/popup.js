@@ -1,5 +1,7 @@
-var noteListEl = document.querySelector("#notes ol");
-var cardEl = document.querySelector('#card .card-content');
+let noteListEl = document.querySelector("#notes ol");
+let cardEl = document.querySelector('#card .card-content');
+let mainNoteEl = document.querySelector('#editor .main-note .content');
+let subNoteEl = document.querySelector('#editor .sub-note .content');
 
 var api_svc = 'http://ldd.cool:1500/api';
 if (window.location.hostname.indexOf('localhost') != -1 || window.location.hostname.indexOf('127.0.0.1') != -1) {
