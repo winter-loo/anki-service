@@ -11,30 +11,6 @@ const getContainer = () => {
     return container;
 };
 
-// `user_note` only contains `fields` property
-const apiUpdateNote = async (note_id, user_note) => {
-    const res = await fetch(`https://me.ldd.cool/api/note/update/@${note_id}`, {
-        method: 'POST',
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(user_note)
-    });
-    await res.json();
-};
-
-const apiAddNote = async (note) => {
-    const res = await fetch('https://me.ldd.cool/api/note/add', {
-        method: 'POST',
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(note)
-    });
-    const data = await res.json();
-    return data['note_id'];
-}
-
 async function main() {
     let container = getContainer();
 
@@ -67,9 +43,11 @@ async function main() {
                 editor.querySelector('#sub-note .content').value,
             ];
             if (noteId === '') {
-                await apiAddNote({ fields });
+                // await apiAddNote({ fields });
+                chrome.runtime.sendMessage({ type: 'add-note', fields })
             } else {
-                await apiUpdateNote(noteId, { fields });
+                // await apiUpdateNote(noteId, { fields });
+                chrome.runtime.sendMessage({ type: 'update-note', noteId, fields });
             }
             let container = getContainer();
             container.shadowRoot.querySelector('#dnote-extension-root').style.display = 'none';
@@ -88,15 +66,14 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
         let mainNoteContentEl = container.shadowRoot.querySelector('#main-note .content');
         mainNoteContentEl.value = text;
 
-        const noteId = await apiAddNote({
-            fields: [text],
-        });
-
-        container.shadowRoot.getElementById('editor').dataset.noteId = noteId;
+        chrome.runtime.sendMessage({ type: 'add-note', fields: [text] });
     } else if (request.type == 'ai-note') {
         let container = getContainer();
         let subNoteContentEl = container.shadowRoot.querySelector('#sub-note .content');
         subNoteContentEl.value = request.text;
+    } else if (request.type == 'resp-add-note') {
+        let container = getContainer();
+        container.shadowRoot.getElementById('editor').dataset.noteId = request.noteId;
     }
 });
 

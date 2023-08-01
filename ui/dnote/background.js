@@ -124,6 +124,37 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       text: aiNote
     });
   });
+});
 
+// `user_note` only contains `fields` property
+const apiUpdateNote = async (note_id, user_note) => {
+    const res = await fetch(`https://me.ldd.cool/api/note/update/@${note_id}`, {
+        method: 'POST',
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(user_note)
+    });
+    await res.json();
+};
 
+const apiAddNote = async (note) => {
+    const res = await fetch('https://me.ldd.cool/api/note/add', {
+        method: 'POST',
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(note)
+    });
+    const data = await res.json();
+    return data['note_id'];
+}
+
+chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
+  if (request.type == 'add-note') {
+    const noteId = await apiAddNote({ fields: request.fields });
+    chrome.tabs.sendMessage(sender.tab.id, { type: 'resp-add-note', noteId });
+  } else if (request.type == 'update-note') {
+    await apiUpdateNote(request.noteId, { fields: request.fields });
+  }
 });
