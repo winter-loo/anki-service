@@ -6,6 +6,18 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+function generateUUID() {
+  let d = new Date().getTime();
+  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+    d += performance.now(); // Add high-resolution time if available
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = (d + Math.random() * 16) % 16 | 0;
+    d = Math.floor(d / 16);
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
 const fetchApiKey = async () => {
   const response = await fetch('https://chat.openai.com/api/auth/session', {
     method: "GET",
@@ -24,22 +36,49 @@ const fetchAiNotes = async (text, onMessage) => {
     if (apiKey === '') {
       apiKey = await fetchApiKey();
     }
+    var prompt = '';
+    var numWords = text.split(' ').length;
+    if (numWords == 1) {
+      prompt = `Please translate the following word into Chinese. Reply in the following format:
+      <phonetic notation>
+      <the most common English meaning in simple English words>
+      <word translation in Chinese>
+      <English sentence example>
+      <Chinese translation of the Example>
+    Your reply should only have the five lines without angle brackets and without any prefix.
+    The text is: ${text}.`;
+    } else if (numWords > 1 && numWords <= 5) {
+      prompt = `Please translate the following English phrase into Chinese. Reply in the following format:
+      <English explanation in short, simple English words>
+      <phrase translation in Chinese>
+      <English sentence Example>
+      <Chinese translation of the Example>
+    Your reply should only have the four lines without angle brackets and without any prefix.
+    The text is: ${text}`;
+    } else {
+      prompt = `Please translate the following sentence into Chinese without explanation. Reply in the following format:
+      <original sentence in English>
+      <sentence translation in Chinese>
+    Your reply should only have the two lines without angle brackets and without any prefix.
+    The text is: ${text}`;
+    }
+    console.log(prompt);
     const payload = {
       "action": "next",
       "messages": [
         {
-          "id": "859f89e4-ccfa-4b9e-92b3-61ff30f4bc02",
+          "id": generateUUID(),
           "role": "user",
           "content": {
             "content_type": "text",
             "parts": [
-              `translate the following English text to Chinese: ${text}`
+              prompt
             ]
           }
         }
       ],
       "model": "gpt-3.5-turbo",
-      "parent_message_id": "bf843341-c16e-477e-abbc-f18e47fb40a6",
+      "parent_message_id": generateUUID(),
       "history_and_training_disabled": true
     };
 
@@ -84,7 +123,7 @@ const fetchAiNotes = async (text, onMessage) => {
               // console.log(jsonData);
               if (jsonData != "[DONE]") {
                 let msg = JSON.parse(jsonData);
-                console.log('Received JSON msg:', msg);
+                // console.log('Received JSON msg:', msg);
 
                 if (msg.message && msg.message.author.role == 'assistant' &&
                   msg.message.content.content_type == 'text') {
@@ -128,26 +167,26 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 // `user_note` only contains `fields` property
 const apiUpdateNote = async (note_id, user_note) => {
-    const res = await fetch(`https://me.ldd.cool/api/note/update/@${note_id}`, {
-        method: 'POST',
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(user_note)
-    });
-    await res.json();
+  const res = await fetch(`https://me.ldd.cool/api/note/update/@${note_id}`, {
+    method: 'POST',
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(user_note)
+  });
+  await res.json();
 };
 
 const apiAddNote = async (note) => {
-    const res = await fetch('https://me.ldd.cool/api/note/add', {
-        method: 'POST',
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(note)
-    });
-    const data = await res.json();
-    return data['note_id'];
+  const res = await fetch('https://me.ldd.cool/api/note/add', {
+    method: 'POST',
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(note)
+  });
+  const data = await res.json();
+  return data['note_id'];
 }
 
 chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
@@ -156,5 +195,12 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
     chrome.tabs.sendMessage(sender.tab.id, { type: 'resp-add-note', noteId });
   } else if (request.type == 'update-note') {
     await apiUpdateNote(request.noteId, { fields: request.fields });
+  } else if (request.type = 'request-ai-note') {
+    fetchAiNotes(request.text, (aiNote) => {
+      chrome.tabs.sendMessage(sender.tab.id, {
+        type: 'ai-note',
+        text: aiNote
+      });
+    });
   }
 });
