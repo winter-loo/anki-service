@@ -40,7 +40,7 @@ const fetchAiNotes = async (text, onMessage) => {
     var numWords = text.split(' ').length;
     if (numWords == 1) {
       prompt = `Please translate the following word into Chinese. Reply in the following format:
-      <phonetic notation>
+      /<phonetic symbol for American pronunciation>/
       <the most common English meaning in simple English words>
       <word translation in Chinese>
       <English sentence example>
