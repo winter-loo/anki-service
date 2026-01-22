@@ -65,7 +65,7 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 ENV PYTHONPATH="/app/anki-service/out/pylib:/app/anki-service/pylib"
 
 # Install LibreTranslate in the virtual environment
-RUN pip install libretranslate
+# RUN pip install libretranslate
 
 # Copy and ensure startup script is executable
 COPY start.sh /app/anki-service/start.sh
