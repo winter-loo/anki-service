@@ -20,12 +20,19 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 # Set working directory
 WORKDIR /app
 
-# Copy project files
-COPY . .
+# Build arguments for repository and branch
+ARG REPO_URL=https://github.com/winter-loo/anki-service.git
+ARG BRANCH=main
 
-# Configure git to allow running commands in the copied repository
+# Clone the repository
+RUN git clone --depth 1 --branch ${BRANCH} ${REPO_URL} anki-service
+
+# Switch to the repository directory
+WORKDIR /app/anki-service
+
+# Configure git to allow running commands in the repository
 # This prevents "fatal: detected dubious ownership in repository" errors
-RUN git config --global --add safe.directory /app
+RUN git config --global --add safe.directory /app/anki-service
 
 # Ensure the 'run' script is executable
 RUN chmod +x run ninja run_web_api
@@ -42,22 +49,30 @@ WORKDIR /app
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     libssl3 \
+    gcc \
+    g++ \
+    pkg-config \
+    libcairo2-dev \
+    libicu-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy build artifacts and source
-COPY --from=builder /app /app
+# Copy build artifacts and source from the repository directory
+COPY --from=builder /app/anki-service /app/anki-service
 
 # Set environment variables for runtime
-# The build created a venv at out/pyenv.
-# We set VIRTUAL_ENV and update PATH so that 'uvicorn' (installed in venv) is found.
-ENV VIRTUAL_ENV=/app/out/pyenv
+ENV VIRTUAL_ENV=/app/anki-service/out/pyenv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-# 'run_web_api' sets PYTHONPATH, but we can set it here too to be safe/clear.
-ENV PYTHONPATH="/app/out/pylib:/app/pylib"
+ENV PYTHONPATH="/app/anki-service/out/pylib:/app/anki-service/pylib"
 
-# Expose port (default for uvicorn is 8000)
-EXPOSE 8000
+# Install LibreTranslate in the virtual environment
+RUN pip install libretranslate
 
-# Entrypoint
-# We run uvicorn directly to bind to 0.0.0.0, as localhost binding in run_web_api won't be accessible.
-CMD ["uvicorn", "web_api:app", "--host", "0.0.0.0", "--port", "8000"]
+# Copy and ensure startup script is executable
+COPY start.sh /app/anki-service/start.sh
+RUN chmod +x /app/anki-service/start.sh
+
+# Expose ports (8000 for Anki, 5000 for LibreTranslate)
+EXPOSE 8000 5000
+
+# Use the startup script to run both services
+CMD ["/app/anki-service/start.sh"]
