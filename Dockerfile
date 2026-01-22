@@ -23,6 +23,10 @@ WORKDIR /app
 # Copy project files
 COPY . .
 
+# Configure git to allow running commands in the copied repository
+# This prevents "fatal: detected dubious ownership in repository" errors
+RUN git config --global --add safe.directory /app
+
 # Ensure the 'run' script is executable
 RUN chmod +x run ninja run_web_api
 

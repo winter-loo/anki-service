@@ -148,10 +148,15 @@ fn maybe_update_buildhash(build_root: &Utf8Path) {
 fn get_buildhash() -> String {
     let output = Command::new("git")
         .args(["rev-parse", "--short=8", "HEAD"])
-        .output()
-        .expect("git");
-    assert!(output.status.success(), "git failed");
-    String::from_utf8(output.stdout).unwrap().trim().into()
+        .output();
+
+    if let Ok(output) = output {
+        if output.status.success() {
+            return String::from_utf8(output.stdout).unwrap().trim().into();
+        }
+    }
+
+    env::var("BUILD_HASH").unwrap_or_else(|_| "00000000".to_string())
 }
 
 fn write_if_changed(path: &Utf8Path, contents: &str) {
