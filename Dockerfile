@@ -64,15 +64,9 @@ ENV VIRTUAL_ENV=/app/anki-service/out/pyenv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 ENV PYTHONPATH="/app/anki-service/out/pylib:/app/anki-service/pylib"
 
-# Install LibreTranslate in the virtual environment
-# RUN pip install libretranslate
+RUN pip install --upgrade google-genai
 
-# Copy and ensure startup script is executable
-COPY start.sh /app/anki-service/start.sh
-RUN chmod +x /app/anki-service/start.sh
+# Expose ports
+EXPOSE 8000
 
-# Expose ports (8000 for Anki, 5000 for LibreTranslate)
-EXPOSE 8000 5000
-
-# Use the startup script to run both services
-CMD ["/app/anki-service/start.sh"]
+CMD ["uvicorn", "web_api:app", "--host", "0.0.0.0", "--port", "8000"]
