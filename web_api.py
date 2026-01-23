@@ -9,6 +9,7 @@ import json
 import os
 import time
 import logging
+from explain import get_word_explanation
 
 
 try:
@@ -191,6 +192,12 @@ def answer_card(ease: int):
 
     resp = bk.answer_card(answer)
     return MessageToDict(resp)
+
+
+@app.get("/explain/{text}")
+def explain_word(text: str):
+    result = get_word_explanation(text)
+    return result
 
 
 app.mount("/api", api_app)
