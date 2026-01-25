@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 GENAI_API_KEY = os.getenv("GOOGLE_API_KEY")
 
-def get_word_explanation(word: str):
+def get_word_explanation(word: str, model: str = "gemini-2.0-flash"):
     prompt = f"""
     You are an advanced English dictionary and linguistic expert.
     Explain the word: "{word}".
@@ -30,9 +30,8 @@ def get_word_explanation(word: str):
 
     try:
         with genai.Client(api_key=GENAI_API_KEY) as client:
-            # Use Gemini 1.5 Flash (Faster and cheaper for simple tasks)
             response = client.models.generate_content(
-                model='gemini-2.5-flash-lite',
+                model=model,
                 contents=prompt
             )
             # Clean up potential markdown formatting if the model adds ```json

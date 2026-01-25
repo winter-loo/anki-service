@@ -195,8 +195,8 @@ def answer_card(ease: int):
 
 
 @app.get("/explain/{text}")
-def explain_word(text: str):
-    result = get_word_explanation(text)
+def explain_word(text: str, model: str = "gemini-2.0-flash"):
+    result = get_word_explanation(text, model=model)
     return result
 
 
