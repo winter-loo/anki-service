@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 GENAI_API_KEY = os.getenv("GOOGLE_API_KEY")
 
-def get_word_explanation(word: str, model: str = "gemini-2.0-flash"):
+def get_word_explanation(word: str, model: str = "gemini-2.5-flash-lite"):
     prompt = f"""
     You are an advanced English dictionary and linguistic expert.
     Explain the word: "{word}".
