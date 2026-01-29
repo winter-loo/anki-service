@@ -43,6 +43,13 @@ from dataclasses import dataclass
 AUTH_MODE = os.environ.get("ANKI_AUTH_MODE", "dev_header")
 TENANT_BASE_DIR = os.environ.get("ANKI_TENANT_BASE_DIR", "tenants")
 
+# JWT verification (HS256) settings.
+# If you're using Better Auth in a JWT-based session mode, set ANKI_JWT_HS256_SECRET
+# to the same secret as BETTER_AUTH_SECRET.
+JWT_HS256_SECRET = os.environ.get("ANKI_JWT_HS256_SECRET") or os.environ.get("BETTER_AUTH_SECRET")
+JWT_ISSUER = os.environ.get("ANKI_JWT_ISSUER") or os.environ.get("BETTER_AUTH_URL")
+JWT_AUDIENCE = os.environ.get("ANKI_JWT_AUDIENCE")
+
 
 def _ensure_dir(path: str) -> None:
     os.makedirs(path, exist_ok=True)
@@ -54,10 +61,7 @@ def _urlsafe_b64decode(data: str) -> bytes:
 
 
 def _jwt_unverified_claims(token: str) -> dict:
-    """Extract claims without verifying signature.
-
-    We only use this in placeholder mode. In production you MUST verify the JWT.
-    """
+    """Extract claims without verifying signature."""
     parts = token.split(".")
     if len(parts) < 2:
         raise ValueError("not a JWT")
@@ -65,6 +69,66 @@ def _jwt_unverified_claims(token: str) -> dict:
     if not isinstance(payload, dict):
         raise ValueError("invalid JWT payload")
     return payload
+
+
+def _b64url(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).decode("utf-8").rstrip("=")
+
+
+def verify_hs256_jwt(token: str, *, secret: str, issuer: str | None, audience: str | None) -> dict:
+    """Verify an HS256 JWT locally (no external libs).
+
+    Better Auth can run in a JWT cookie-cache mode; in that setup, the JWT is signed
+    with the app secret. This verifier is a pragmatic, dependency-free baseline.
+
+    If you use asymmetric JWTs (JWKS/RS256), swap this for a proper JOSE library.
+    """
+    parts = token.split(".")
+    if len(parts) != 3:
+        raise ValueError("not a JWT")
+    header_b64, payload_b64, sig_b64 = parts
+
+    header = json.loads(_urlsafe_b64decode(header_b64))
+    if not isinstance(header, dict):
+        raise ValueError("invalid header")
+    if header.get("alg") != "HS256":
+        raise ValueError(f"unsupported alg {header.get('alg')!r} (expected HS256)")
+
+    signing_input = f"{header_b64}.{payload_b64}".encode("utf-8")
+    mac = __import__("hmac").new(secret.encode("utf-8"), signing_input, __import__("hashlib").sha256).digest()
+    expected_sig = _b64url(mac)
+
+    if not __import__("hmac").compare_digest(expected_sig, sig_b64):
+        raise ValueError("bad signature")
+
+    claims = json.loads(_urlsafe_b64decode(payload_b64))
+    if not isinstance(claims, dict):
+        raise ValueError("invalid payload")
+
+    now = int(time.time())
+    # Standard claim checks
+    exp = claims.get("exp")
+    if exp is not None and int(exp) < now:
+        raise ValueError("token expired")
+    nbf = claims.get("nbf")
+    if nbf is not None and int(nbf) > now:
+        raise ValueError("token not yet valid")
+
+    if issuer and claims.get("iss") not in (issuer,):
+        raise ValueError("issuer mismatch")
+
+    if audience:
+        aud = claims.get("aud")
+        if isinstance(aud, str):
+            ok = aud == audience
+        elif isinstance(aud, list):
+            ok = audience in aud
+        else:
+            ok = False
+        if not ok:
+            raise ValueError("audience mismatch")
+
+    return claims
 
 
 def require_tenant_id(
@@ -87,13 +151,21 @@ def require_tenant_id(
             raise HTTPException(401, "Missing Bearer token")
         token = authorization.split(" ", 1)[1].strip()
 
-        # TODO: Verify JWT signature + issuer/audience using your auth provider's JWKS.
-        # For now we only parse unverified claims so the codebase is ready for the
-        # proper verifier.
+        if not JWT_HS256_SECRET:
+            raise HTTPException(
+                500,
+                "JWT auth enabled but no secret configured. Set ANKI_JWT_HS256_SECRET (or BETTER_AUTH_SECRET).",
+            )
+
         try:
-            claims = _jwt_unverified_claims(token)
-        except Exception:
-            raise HTTPException(401, "Invalid token")
+            claims = verify_hs256_jwt(
+                token,
+                secret=JWT_HS256_SECRET,
+                issuer=JWT_ISSUER,
+                audience=JWT_AUDIENCE,
+            )
+        except Exception as e:
+            raise HTTPException(401, f"Invalid token: {e}")
 
         tenant_id = claims.get("sub")
         if not tenant_id:

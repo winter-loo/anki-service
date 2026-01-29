@@ -16,7 +16,14 @@ By default, the API is **multi-tenant**: each authenticated user maps to a separ
 Set `ANKI_AUTH_MODE`:
 
 - `dev_header` (default): send `X-User-Id: <tenant_id>` (useful for local dev)
-- `jwt`: send `Authorization: Bearer <jwt>`; the code currently extracts `sub` and is structured for adding proper JWT verification (issuer/JWKS/audience) next.
+- `jwt`: send `Authorization: Bearer <jwt>`; verifies **HS256** JWTs locally using a shared secret.
+
+JWT-related env vars:
+- `ANKI_JWT_HS256_SECRET` (recommended) or `BETTER_AUTH_SECRET`
+- `ANKI_JWT_ISSUER` (optional) or `BETTER_AUTH_URL`
+- `ANKI_JWT_AUDIENCE` (optional)
+
+If you use RS256/JWKS, replace the HS256 verifier with a JOSE library and JWKS fetch.
 
 ## Local Installation (No Docker)
 
