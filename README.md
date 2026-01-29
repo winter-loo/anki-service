@@ -2,6 +2,22 @@
 
 This project provides an Anki Web API, which can be run either locally or via a containerized environment (Podman/Docker).
 
+## Multi-tenant + Auth (recommended)
+
+By default, the API is **multi-tenant**: each authenticated user maps to a separate Anki collection on disk.
+
+- Tenant storage root: `tenants/` (configurable via `ANKI_TENANT_BASE_DIR`)
+- Per-tenant collection:
+  - `tenants/<tenant_id>/collection.anki2`
+  - `tenants/<tenant_id>/collection.media/`
+
+### Auth modes
+
+Set `ANKI_AUTH_MODE`:
+
+- `dev_header` (default): send `X-User-Id: <tenant_id>` (useful for local dev)
+- `jwt`: send `Authorization: Bearer <jwt>`; the code currently extracts `sub` and is structured for adding proper JWT verification (issuer/JWKS/audience) next.
+
 ## Local Installation (No Docker)
 
 If you prefer to run the service directly on your host machine, follow these steps.

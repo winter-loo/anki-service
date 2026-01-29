@@ -1,33 +1,172 @@
+from __future__ import annotations
+
 from anki._backend import RustBackend
-from fastapi import FastAPI
+import anki.search_pb2
+import anki.cards_pb2
+import anki.scheduler_pb2
+
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel
-import anki.search_pb2
-import json
-import os
-import time
-import logging
+
 from explain import get_word_explanation
 
+import base64
+import json
+import os
+import threading
+import time
+from dataclasses import dataclass
 
-try:
-    os.mkdir('instance')
-except FileExistsError:
-    pass
 
-RustBackend.initialize_logging('instance/log')
-bk = RustBackend(['en'], True)
+# -----------------------------
+# Multi-tenancy + Auth (best practice)
+# -----------------------------
+#
+# The frontend (e.g. Better Auth) should authenticate the user and call this API with
+#   Authorization: Bearer <token>
+#
+# This service then maps the authenticated user/org to a *tenant*, and uses a separate
+# Anki collection per tenant:
+#   tenants/<tenant_id>/collection.anki2
+#   tenants/<tenant_id>/collection.media/
+#
+# NOTE: Proper JWT signature verification depends on your auth provider (issuer/JWKS/etc).
+# This implementation supports:
+# - Production: set ANKI_AUTH_MODE=jwt and plug in your verifier later
+# - Development: set ANKI_AUTH_MODE=dev_header and send X-User-Id
+#
+# In all cases, we never trust an arbitrary tenant header unless explicitly enabled.
 
-bk.open_collection(collection_path='instance/collection.anki2',
-                   media_folder_path='instance/collection.media',
-                   media_db_path='instance/collection.media.db2',
-                   force_schema11=False)
+AUTH_MODE = os.environ.get("ANKI_AUTH_MODE", "dev_header")
+TENANT_BASE_DIR = os.environ.get("ANKI_TENANT_BASE_DIR", "tenants")
 
+
+def _ensure_dir(path: str) -> None:
+    os.makedirs(path, exist_ok=True)
+
+
+def _urlsafe_b64decode(data: str) -> bytes:
+    data += "=" * (-len(data) % 4)
+    return base64.urlsafe_b64decode(data.encode("utf-8"))
+
+
+def _jwt_unverified_claims(token: str) -> dict:
+    """Extract claims without verifying signature.
+
+    We only use this in placeholder mode. In production you MUST verify the JWT.
+    """
+    parts = token.split(".")
+    if len(parts) < 2:
+        raise ValueError("not a JWT")
+    payload = json.loads(_urlsafe_b64decode(parts[1]))
+    if not isinstance(payload, dict):
+        raise ValueError("invalid JWT payload")
+    return payload
+
+
+def require_tenant_id(
+    authorization: str | None = Header(default=None),
+    x_user_id: str | None = Header(default=None),
+) -> str:
+    """Resolve tenant id from an authenticated identity.
+
+    Best practice: Authorization Bearer token -> verified -> subject claim (sub).
+
+    Dev mode supported: X-User-Id header.
+    """
+    if AUTH_MODE == "dev_header":
+        if not x_user_id:
+            raise HTTPException(401, "Missing X-User-Id (dev mode)")
+        return x_user_id
+
+    if AUTH_MODE == "jwt":
+        if not authorization or not authorization.lower().startswith("bearer "):
+            raise HTTPException(401, "Missing Bearer token")
+        token = authorization.split(" ", 1)[1].strip()
+
+        # TODO: Verify JWT signature + issuer/audience using your auth provider's JWKS.
+        # For now we only parse unverified claims so the codebase is ready for the
+        # proper verifier.
+        try:
+            claims = _jwt_unverified_claims(token)
+        except Exception:
+            raise HTTPException(401, "Invalid token")
+
+        tenant_id = claims.get("sub")
+        if not tenant_id:
+            raise HTTPException(401, "Token missing 'sub'")
+        return str(tenant_id)
+
+    raise HTTPException(500, f"Unknown ANKI_AUTH_MODE={AUTH_MODE!r}")
+
+
+@dataclass
+class TenantBackend:
+    backend: RustBackend
+    lock: threading.Lock
+
+
+class BackendManager:
+    """Caches a RustBackend per tenant and protects SQLite access with a lock."""
+
+    def __init__(self, base_dir: str) -> None:
+        self.base_dir = base_dir
+        _ensure_dir(self.base_dir)
+        self._items: dict[str, TenantBackend] = {}
+        self._guard = threading.Lock()
+
+    def _tenant_paths(self, tenant_id: str) -> tuple[str, str, str, str]:
+        tenant_dir = os.path.join(self.base_dir, tenant_id)
+        _ensure_dir(tenant_dir)
+        collection_path = os.path.join(tenant_dir, "collection.anki2")
+        media_folder_path = os.path.join(tenant_dir, "collection.media")
+        media_db_path = os.path.join(tenant_dir, "collection.media.db2")
+        log_dir = os.path.join(tenant_dir, "log")
+        _ensure_dir(media_folder_path)
+        _ensure_dir(log_dir)
+        return tenant_dir, collection_path, media_folder_path, media_db_path
+
+    def get(self, tenant_id: str) -> TenantBackend:
+        with self._guard:
+            if tenant_id in self._items:
+                return self._items[tenant_id]
+
+            _, collection_path, media_folder_path, media_db_path = self._tenant_paths(
+                tenant_id
+            )
+
+            # Initialize backend per tenant.
+            # Logging initialization is global-ish, but we can still point it at the
+            # tenant's directory for easier debugging.
+            RustBackend.initialize_logging(os.path.join(self.base_dir, tenant_id, "log"))
+            bk = RustBackend(["en"], True)
+            bk.open_collection(
+                collection_path=collection_path,
+                media_folder_path=media_folder_path,
+                media_db_path=media_db_path,
+                force_schema11=False,
+            )
+
+            item = TenantBackend(backend=bk, lock=threading.Lock())
+            self._items[tenant_id] = item
+            return item
+
+
+backend_manager = BackendManager(TENANT_BASE_DIR)
+
+
+def get_bk(tenant_id: str = Depends(require_tenant_id)) -> TenantBackend:
+    return backend_manager.get(tenant_id)
+
+
+# -----------------------------
+# FastAPI apps
+# -----------------------------
 api_app = FastAPI(title="Anki Web API")
 app = FastAPI(title="main app")
-
 
 # Set up CORS middleware
 origins = [
@@ -54,83 +193,91 @@ class UserNote(BaseModel):
 
 
 @api_app.get("/note/list")
-def list_notes():
-    deck = bk.get_current_deck()
-    sn = anki.search_pb2.SearchNode(deck=deck.name)
-    ss = bk.build_search_string(sn)
-    so = anki.search_pb2.SortOrder(
-            builtin=anki.search_pb2.SortOrder.Builtin(column="noteCrt"))
-    note_id_list = bk.search_notes(search=ss, order=so)
-    resp = []
-    for nid in note_id_list:
-        note = bk.get_note(nid)
-        note = MessageToDict(note)
-        resp.append(note)
-    return resp
+def list_notes(tb: TenantBackend = Depends(get_bk)):
+    with tb.lock:
+        deck = tb.backend.get_current_deck()
+        sn = anki.search_pb2.SearchNode(deck=deck.name)
+        ss = tb.backend.build_search_string(sn)
+        so = anki.search_pb2.SortOrder(
+            builtin=anki.search_pb2.SortOrder.Builtin(column="noteCrt")
+        )
+        note_id_list = tb.backend.search_notes(search=ss, order=so)
+        resp = []
+        for nid in note_id_list:
+            note = tb.backend.get_note(nid)
+            resp.append(MessageToDict(note))
+        return resp
 
 
 @api_app.post("/note/add/{fld}")
-def create_note(fld: str):
-    basic_notetype = bk.get_notetype_names()[0]
-    nn = bk.new_note(basic_notetype.id)
-    nn.fields[0] = fld
-    resp = bk.add_note(note=nn, deck_id=bk.get_current_deck().id)
-    return {"note_id": resp.note_id}
+def create_note(fld: str, tb: TenantBackend = Depends(get_bk)):
+    with tb.lock:
+        basic_notetype = tb.backend.get_notetype_names()[0]
+        nn = tb.backend.new_note(basic_notetype.id)
+        nn.fields[0] = fld
+        resp = tb.backend.add_note(note=nn, deck_id=tb.backend.get_current_deck().id)
+        return {"note_id": resp.note_id}
 
 
 @api_app.post("/note/add")
-def create_note_by_json(new_user_note: UserNote):
-    basic_notetype = bk.get_notetype_names()[0]
-    nn = bk.new_note(basic_notetype.id)
-    # RustBackend.new_note() returns a Note object with two fields
-    nn.fields[0] = new_user_note.fields[0]
-    if len(new_user_note.fields) > 1:
-        nn.fields[1] = new_user_note.fields[1]
-    for fld in new_user_note.fields[2:]:
-        nn.fields.append(fld)
-    resp = bk.add_note(note=nn, deck_id=bk.get_current_deck().id)
-    return {"note_id": resp.note_id}
+def create_note_by_json(new_user_note: UserNote, tb: TenantBackend = Depends(get_bk)):
+    with tb.lock:
+        basic_notetype = tb.backend.get_notetype_names()[0]
+        nn = tb.backend.new_note(basic_notetype.id)
+        # RustBackend.new_note() returns a Note object with two fields
+        nn.fields[0] = new_user_note.fields[0]
+        if len(new_user_note.fields) > 1:
+            nn.fields[1] = new_user_note.fields[1]
+        for fld in new_user_note.fields[2:]:
+            nn.fields.append(fld)
+        resp = tb.backend.add_note(note=nn, deck_id=tb.backend.get_current_deck().id)
+        return {"note_id": resp.note_id}
 
 
 @api_app.post("/note/update/@{note_id}")
-def update_note_by_id(note_id: int, user_note: UserNote):
-    note = bk.get_note(note_id)
-    note.fields[0] = user_note.fields[0]
-    note.fields[1] = user_note.fields[1]
-    resp = bk.update_notes(notes=[note], skip_undo_entry=True)
-    return MessageToDict(resp)
+def update_note_by_id(note_id: int, user_note: UserNote, tb: TenantBackend = Depends(get_bk)):
+    with tb.lock:
+        note = tb.backend.get_note(note_id)
+        note.fields[0] = user_note.fields[0]
+        note.fields[1] = user_note.fields[1]
+        resp = tb.backend.update_notes(notes=[note], skip_undo_entry=True)
+        return MessageToDict(resp)
 
 
 @api_app.get("/note/@{note_id}")
-def read_note_by_id(note_id: int):
-    note = bk.get_note(note_id)
-    note = MessageToDict(note)
-    return note
+def read_note_by_id(note_id: int, tb: TenantBackend = Depends(get_bk)):
+    with tb.lock:
+        note = tb.backend.get_note(note_id)
+        return MessageToDict(note)
 
 
 @api_app.post("/note/delete/@{note_id}")
-def delete_note_by_id(note_id: int):
-    card_ids = bk.cards_of_note(nid=note_id)
-    resp = bk.remove_notes(note_ids=[note_id], card_ids=card_ids)
-    return MessageToDict(resp)
+def delete_note_by_id(note_id: int, tb: TenantBackend = Depends(get_bk)):
+    with tb.lock:
+        card_ids = tb.backend.cards_of_note(nid=note_id)
+        resp = tb.backend.remove_notes(note_ids=[note_id], card_ids=card_ids)
+        return MessageToDict(resp)
 
 
 @api_app.get("/note/studied_today")
-def list_notes_studied_today():
-    resp = bk.studied_today()
-    return {"msg": resp}
+def list_notes_studied_today(tb: TenantBackend = Depends(get_bk)):
+    with tb.lock:
+        resp = tb.backend.studied_today()
+        return {"msg": resp}
 
 
 @api_app.get("/card/sched_timing_today")
-def get_scheduled_timing_today():
-    resp = bk.sched_timing_today()
-    return MessageToDict(resp)
+def get_scheduled_timing_today(tb: TenantBackend = Depends(get_bk)):
+    with tb.lock:
+        resp = tb.backend.sched_timing_today()
+        return MessageToDict(resp)
 
 
 @api_app.get("/card/next")
-def get_next_card():
-    qcards = bk.get_queued_cards(fetch_limit=1, intraday_learning_only=False)
-    return MessageToDict(qcards)
+def get_next_card(tb: TenantBackend = Depends(get_bk)):
+    with tb.lock:
+        qcards = tb.backend.get_queued_cards(fetch_limit=1, intraday_learning_only=False)
+        return MessageToDict(qcards)
 
 
 def int_time(scale: int = 1) -> int:
@@ -178,20 +325,21 @@ def rating_from_ease(ease):
 
 
 @api_app.post("/card/answer/{ease}")
-def answer_card(ease: int):
-    qcards = bk.get_queued_cards(fetch_limit=1, intraday_learning_only=False)
-    if len(qcards.cards) == 0:
-        return {}
-    top_card = qcards.cards[0].card
-    current_states = qcards.cards[0].states
-    answer = build_answer(
-        card=top_card,
-        states=current_states,
-        rating=rating_from_ease(ease),
-    )
+def answer_card(ease: int, tb: TenantBackend = Depends(get_bk)):
+    with tb.lock:
+        qcards = tb.backend.get_queued_cards(fetch_limit=1, intraday_learning_only=False)
+        if len(qcards.cards) == 0:
+            return {}
+        top_card = qcards.cards[0].card
+        current_states = qcards.cards[0].states
+        answer = build_answer(
+            card=top_card,
+            states=current_states,
+            rating=rating_from_ease(ease),
+        )
 
-    resp = bk.answer_card(answer)
-    return MessageToDict(resp)
+        resp = tb.backend.answer_card(answer)
+        return MessageToDict(resp)
 
 
 @app.get("/explain/{text}")
