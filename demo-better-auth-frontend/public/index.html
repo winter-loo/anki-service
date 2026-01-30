@@ -74,7 +74,8 @@
         try {
           const email = document.getElementById('email').value;
           const password = document.getElementById('password').value;
-          const data = await post('/api/auth/sign-up/email', { email, password });
+          const name = email.includes('@') ? email.split('@')[0] : email;
+          const data = await post('/api/auth/sign-up/email', { email, password, name });
           log(data);
         } catch (e) { log(String(e)); }
       };

@@ -11,14 +11,19 @@ import { betterAuth } from "better-auth";
 // This demo uses SQLite (file) for ease.
 const db = new Database("./auth.sqlite");
 
+const baseURL = process.env.BETTER_AUTH_URL || "http://localhost:3000";
+const secret = process.env.BETTER_AUTH_SECRET;
+if (!secret || secret.length < 32) {
+  throw new Error("BETTER_AUTH_SECRET must be set and at least 32 characters long");
+}
+
 export const auth = betterAuth({
-  // Use env vars by default (recommended by Better Auth).
-  // baseURL: process.env.BETTER_AUTH_URL,
-  // secret: process.env.BETTER_AUTH_SECRET,
+  baseURL,
+  secret,
 
   database: db,
   emailAndPassword: { enabled: true },
 
   // In production, lock this down.
-  trustedOrigins: [process.env.BETTER_AUTH_URL || "http://localhost:3000"],
+  trustedOrigins: [baseURL],
 });
