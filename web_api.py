@@ -276,12 +276,12 @@ class BackendManager:
                     "Anki RustBackend is not available (missing compiled extension). Run ./build_anki first."
                 )
 
-            _, collection_path, media_folder_path, media_db_path = self._tenant_paths(tenant_id)
+            tenant_dir, collection_path, media_folder_path, media_db_path = self._tenant_paths(tenant_id)
 
             # Initialize backend per tenant.
             # Logging initialization is global-ish, but we can still point it at the
             # tenant's directory for easier debugging.
-            RustBackend.initialize_logging(os.path.join(self.base_dir, tenant_id, "log"))
+            RustBackend.initialize_logging(os.path.join(tenant_dir, "log"))
             bk = RustBackend(["en"], True)
             bk.open_collection(
                 collection_path=collection_path,
