@@ -30,6 +30,7 @@
     <div class="row">
       <button id="signup">Sign up</button>
       <button id="signin">Sign in</button>
+      <button id="signinGoogle">Sign in with Google</button>
       <button id="signout">Sign out</button>
     </div>
 
@@ -86,6 +87,29 @@
           const password = document.getElementById('password').value;
           const data = await post('/api/auth/sign-in/email', { email, password });
           log(data);
+        } catch (e) { log(String(e)); }
+      };
+
+      document.getElementById('signinGoogle').onclick = async () => {
+        try {
+          // Better Auth social login: request auth URL then redirect the browser.
+          // NOTE: This requires GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET configured on the server.
+          const r = await fetch('/api/auth/sign-in/social', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              provider: 'google',
+              callbackURL: window.location.href,
+              disableRedirect: true,
+            }),
+          });
+          const t = await r.text();
+          let data;
+          try { data = JSON.parse(t); } catch { data = t; }
+          if (!r.ok) throw new Error(typeof data === 'string' ? data : JSON.stringify(data));
+          if (!data.url) throw new Error('Missing redirect URL');
+          window.location.href = data.url;
         } catch (e) { log(String(e)); }
       };
 

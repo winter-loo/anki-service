@@ -17,12 +17,23 @@ if (!secret || secret.length < 32) {
   throw new Error("BETTER_AUTH_SECRET must be set and at least 32 characters long");
 }
 
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
 export const auth = betterAuth({
   baseURL,
   secret,
 
   database: db,
   emailAndPassword: { enabled: true },
+
+  // Enable Google OAuth if credentials are provided.
+  socialProviders: googleClientId && googleClientSecret ? {
+    google: {
+      clientId: googleClientId,
+      clientSecret: googleClientSecret,
+    },
+  } : undefined,
 
   // In production, lock this down.
   trustedOrigins: [baseURL],

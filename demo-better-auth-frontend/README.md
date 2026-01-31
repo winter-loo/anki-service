@@ -37,6 +37,23 @@ node server.mjs
 Then open:
 - http://localhost:3000
 
+## Google OAuth (optional)
+
+This demo can also support **Sign in with Google** (OAuth redirect flow).
+
+1) Create an OAuth Client ID in Google Cloud Console.
+2) Add an Authorized redirect URI that matches your Better Auth base URL.
+
+For the current Tailscale Funnel URL, use:
+- `https://desktop-vl6jo22.taila6b1f7.ts.net/api/auth/callback/google`
+
+3) Provide env vars when starting the frontend:
+
+```bash
+export GOOGLE_CLIENT_ID='...'
+export GOOGLE_CLIENT_SECRET='...'
+```
+
 ## Notes / Production hardening
 
 - Replace SQLite with Postgres.
