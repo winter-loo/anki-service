@@ -281,7 +281,9 @@ class BackendManager:
             # Initialize backend per tenant.
             # Logging initialization is global-ish, but we can still point it at the
             # tenant's directory for easier debugging.
-            RustBackend.initialize_logging(os.path.join(tenant_dir, "log"))
+            # Passing a custom log directory path can fail on some platforms/builds.
+            # Default logging setup is sufficient for the web API.
+            RustBackend.initialize_logging(None)
             bk = RustBackend(["en"], True)
             bk.open_collection(
                 collection_path=collection_path,
