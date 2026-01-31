@@ -42,10 +42,13 @@ Then open:
 This demo can also support **Sign in with Google** (OAuth redirect flow).
 
 1) Create an OAuth Client ID in Google Cloud Console.
-2) Add an Authorized redirect URI that matches your Better Auth base URL.
+2) Set:
 
-For the current Tailscale Funnel URL, use:
-- `https://desktop-vl6jo22.taila6b1f7.ts.net/api/auth/callback/google`
+- Authorized JavaScript origin: `${BETTER_AUTH_URL}`
+- Authorized redirect URI: `${BETTER_AUTH_URL}/api/auth/callback/google`
+
+If you are using Tailscale Funnel and MagicDNS, `${BETTER_AUTH_URL}` will look like:
+- `https://<your-node>.<tailnet>.ts.net`
 
 3) Provide env vars when starting the frontend:
 
