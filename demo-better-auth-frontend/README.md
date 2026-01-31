@@ -3,8 +3,8 @@
 This is a **minimal** Express + static HTML demo that:
 
 1) Uses **Better Auth** for sign-up/sign-in (email + password)
-2) Mints a short-lived **HS256 JWT** (server-side) using the same secret
-3) Calls `anki-service` with `Authorization: Bearer <jwt>`
+2) Mints a short-lived **RS256 JWT** (server-side)
+3) Exposes a **JWKS** endpoint and calls `anki-service` with `Authorization: Bearer <jwt>`
 
 Why we mint our own JWT:
 - Better Auth can represent sessions in different ways (cookies, compact cache, jwt cache, etc).
@@ -18,7 +18,9 @@ In one terminal (anki-service):
 ```bash
 cd /home/ldd/anki-service
 export ANKI_AUTH_MODE=jwt
-export ANKI_JWT_HS256_SECRET='your-32+-char-secret'
+export ANKI_JWT_ALG=RS256
+export BETTER_AUTH_URL='http://localhost:3000'   # used as issuer (iss)
+# JWKS default is derived as ${BETTER_AUTH_URL}/.well-known/jwks.json
 ./run_web_api
 ```
 
@@ -27,7 +29,6 @@ In another terminal (frontend):
 ```bash
 cd /home/ldd/anki-service/demo-better-auth-frontend
 npm install
-export BETTER_AUTH_SECRET='your-32+-char-secret'   # MUST match ANKI_JWT_HS256_SECRET
 export BETTER_AUTH_URL='http://localhost:3000'
 export ANKI_SERVICE_URL='http://localhost:8000'
 node server.mjs

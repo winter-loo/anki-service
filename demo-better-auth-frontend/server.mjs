@@ -40,19 +40,44 @@ function b64url(buf) {
   return buf.toString("base64").replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
-function signHS256({ header, payload, secret }) {
+// RS256 keypair (demo-only).
+// In production you'd use a stable key (HSM/KMS/etc) and rotate keys.
+const kid = process.env.ANKI_JWT_KID || "demo-key-1";
+const { privateKey, publicKey } = crypto.generateKeyPairSync("rsa", {
+  modulusLength: 2048,
+  publicKeyEncoding: { type: "spki", format: "pem" },
+  privateKeyEncoding: { type: "pkcs8", format: "pem" },
+});
+
+function signRS256({ header, payload, privateKeyPem }) {
   const h = b64url(Buffer.from(JSON.stringify(header)));
   const p = b64url(Buffer.from(JSON.stringify(payload)));
   const input = `${h}.${p}`;
-  const sig = crypto.createHmac("sha256", secret).update(input).digest();
+  const sig = crypto.createSign("RSA-SHA256").update(input).end().sign(privateKeyPem);
   return `${input}.${b64url(sig)}`;
 }
+
+// JWKS endpoint (anki-service will fetch this)
+app.get("/.well-known/jwks.json", (req, res) => {
+  // Node can export JWK directly.
+  const jwk = crypto.createPublicKey(publicKey).export({ format: "jwk" });
+  res.json({
+    keys: [
+      {
+        kty: jwk.kty,
+        n: jwk.n,
+        e: jwk.e,
+        kid,
+        use: "sig",
+        alg: "RS256",
+      },
+    ],
+  });
+});
 
 // Mint a Bearer JWT for anki-service.
 // Browser calls this after login; we validate the Better Auth session server-side.
 app.get("/api/anki-token", async (req, res) => {
-  const secret = process.env.ANKI_JWT_HS256_SECRET || process.env.BETTER_AUTH_SECRET;
-  if (!secret) return res.status(500).json({ error: "Missing BETTER_AUTH_SECRET/ANKI_JWT_HS256_SECRET" });
 
   // Ask Better Auth for the session using incoming cookies.
   const headers = new Headers();
@@ -69,8 +94,8 @@ app.get("/api/anki-token", async (req, res) => {
   const iss = process.env.ANKI_JWT_ISSUER || process.env.BETTER_AUTH_URL;
   const aud = process.env.ANKI_JWT_AUDIENCE;
 
-  const token = signHS256({
-    header: { alg: "HS256", typ: "JWT" },
+  const token = signRS256({
+    header: { alg: "RS256", typ: "JWT", kid },
     payload: {
       sub,
       iss,
@@ -78,7 +103,7 @@ app.get("/api/anki-token", async (req, res) => {
       iat: now,
       exp: now + 60 * 60, // 1h
     },
-    secret,
+    privateKeyPem: privateKey,
   });
 
   res.json({ token, sub });
@@ -88,8 +113,6 @@ app.get("/api/ping-anki", async (req, res) => {
   const ankiBase = process.env.ANKI_SERVICE_URL || "http://localhost:8000";
 
   // Get a JWT bound to the logged-in user
-  const secret = process.env.ANKI_JWT_HS256_SECRET || process.env.BETTER_AUTH_SECRET;
-  if (!secret) return res.status(500).json({ error: "Missing BETTER_AUTH_SECRET/ANKI_JWT_HS256_SECRET" });
 
   const headers = new Headers();
   if (req.headers.cookie) headers.set("cookie", req.headers.cookie);
@@ -97,10 +120,12 @@ app.get("/api/ping-anki", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Not signed in" });
 
   const now = Math.floor(Date.now() / 1000);
-  const token = signHS256({
-    header: { alg: "HS256", typ: "JWT" },
-    payload: { sub: session.user.id, iat: now, exp: now + 60 * 10 },
-    secret,
+  const iss = process.env.ANKI_JWT_ISSUER || process.env.BETTER_AUTH_URL;
+  const aud = process.env.ANKI_JWT_AUDIENCE;
+  const token = signRS256({
+    header: { alg: "RS256", typ: "JWT", kid },
+    payload: { sub: session.user.id, iss, aud, iat: now, exp: now + 60 * 10 },
+    privateKeyPem: privateKey,
   });
 
   const r = await fetch(`${ankiBase}/api/note/list`, {

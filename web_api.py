@@ -1,9 +1,16 @@
 from __future__ import annotations
 
-from anki._backend import RustBackend
-import anki.search_pb2
-import anki.cards_pb2
-import anki.scheduler_pb2
+# NOTE: The Anki Rust bridge modules require a compiled extension.
+# We keep auth-related endpoints importable even if the extension isn't built
+# (useful for lightweight tests like RS256/JWKS auth verification).
+try:
+    from anki._backend import RustBackend  # type: ignore
+    import anki.search_pb2  # type: ignore
+    import anki.cards_pb2  # type: ignore
+    import anki.scheduler_pb2  # type: ignore
+except Exception:  # pragma: no cover
+    RustBackend = None  # type: ignore
+    anki = None  # type: ignore
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,7 +18,10 @@ from fastapi.staticfiles import StaticFiles
 from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel
 
-from explain import get_word_explanation
+try:
+    from explain import get_word_explanation
+except Exception:  # pragma: no cover
+    get_word_explanation = None  # type: ignore
 
 import base64
 import json
@@ -43,12 +53,22 @@ from dataclasses import dataclass
 AUTH_MODE = os.environ.get("ANKI_AUTH_MODE", "dev_header")
 TENANT_BASE_DIR = os.environ.get("ANKI_TENANT_BASE_DIR", "tenants")
 
-# JWT verification (HS256) settings.
-# If you're using Better Auth in a JWT-based session mode, set ANKI_JWT_HS256_SECRET
-# to the same secret as BETTER_AUTH_SECRET.
+# JWT verification settings.
+#
+# Default: RS256 + JWKS (recommended for production)
+#
+# Env vars:
+# - ANKI_JWT_ALG: RS256 (default) or HS256
+# - ANKI_JWKS_URL: JWKS endpoint URL (if RS256). If not set, we derive it from issuer:
+#     <issuer>/.well-known/jwks.json
+# - ANKI_JWT_ISSUER (or BETTER_AUTH_URL)
+# - ANKI_JWT_AUDIENCE (optional)
+# - ANKI_JWT_HS256_SECRET (or BETTER_AUTH_SECRET) if HS256
+JWT_ALG = (os.environ.get("ANKI_JWT_ALG") or "RS256").upper()
 JWT_HS256_SECRET = os.environ.get("ANKI_JWT_HS256_SECRET") or os.environ.get("BETTER_AUTH_SECRET")
 JWT_ISSUER = os.environ.get("ANKI_JWT_ISSUER") or os.environ.get("BETTER_AUTH_URL")
 JWT_AUDIENCE = os.environ.get("ANKI_JWT_AUDIENCE")
+JWT_JWKS_URL = os.environ.get("ANKI_JWKS_URL")
 
 
 def _ensure_dir(path: str) -> None:
@@ -78,10 +98,7 @@ def _b64url(data: bytes) -> str:
 def verify_hs256_jwt(token: str, *, secret: str, issuer: str | None, audience: str | None) -> dict:
     """Verify an HS256 JWT locally (no external libs).
 
-    Better Auth can run in a JWT cookie-cache mode; in that setup, the JWT is signed
-    with the app secret. This verifier is a pragmatic, dependency-free baseline.
-
-    If you use asymmetric JWTs (JWKS/RS256), swap this for a proper JOSE library.
+    Kept for local/dev or legacy setups.
     """
     parts = token.split(".")
     if len(parts) != 3:
@@ -131,6 +148,37 @@ def verify_hs256_jwt(token: str, *, secret: str, issuer: str | None, audience: s
     return claims
 
 
+def _default_jwks_url(issuer: str | None) -> str | None:
+    if not issuer:
+        return None
+    return issuer.rstrip("/") + "/.well-known/jwks.json"
+
+
+def verify_rs256_jwt(token: str, *, jwks_url: str, issuer: str | None, audience: str | None) -> dict:
+    """Verify an RS256 JWT via JWKS.
+
+    Uses PyJWT's PyJWKClient to fetch + cache signing keys.
+    """
+    try:
+        import jwt
+        from jwt import PyJWKClient
+    except Exception as e:  # pragma: no cover
+        raise RuntimeError(f"Missing PyJWT dependency: {e}")
+
+    jwks_client = PyJWKClient(jwks_url)
+    signing_key = jwks_client.get_signing_key_from_jwt(token).key
+
+    # PyJWT will validate exp/nbf automatically unless options override.
+    return jwt.decode(
+        token,
+        signing_key,
+        algorithms=["RS256"],
+        issuer=issuer,
+        audience=audience,
+        options={"verify_aud": bool(audience), "verify_iss": bool(issuer)},
+    )
+
+
 def require_tenant_id(
     authorization: str | None = Header(default=None),
     x_user_id: str | None = Header(default=None),
@@ -151,19 +199,36 @@ def require_tenant_id(
             raise HTTPException(401, "Missing Bearer token")
         token = authorization.split(" ", 1)[1].strip()
 
-        if not JWT_HS256_SECRET:
-            raise HTTPException(
-                500,
-                "JWT auth enabled but no secret configured. Set ANKI_JWT_HS256_SECRET (or BETTER_AUTH_SECRET).",
-            )
-
         try:
-            claims = verify_hs256_jwt(
-                token,
-                secret=JWT_HS256_SECRET,
-                issuer=JWT_ISSUER,
-                audience=JWT_AUDIENCE,
-            )
+            if JWT_ALG == "HS256":
+                if not JWT_HS256_SECRET:
+                    raise HTTPException(
+                        500,
+                        "JWT auth enabled (HS256) but no secret configured. Set ANKI_JWT_HS256_SECRET (or BETTER_AUTH_SECRET).",
+                    )
+                claims = verify_hs256_jwt(
+                    token,
+                    secret=JWT_HS256_SECRET,
+                    issuer=JWT_ISSUER,
+                    audience=JWT_AUDIENCE,
+                )
+            elif JWT_ALG == "RS256":
+                jwks_url = JWT_JWKS_URL or _default_jwks_url(JWT_ISSUER)
+                if not jwks_url:
+                    raise HTTPException(
+                        500,
+                        "JWT auth enabled (RS256) but no JWKS URL configured. Set ANKI_JWKS_URL (or ANKI_JWT_ISSUER/BETTER_AUTH_URL to derive /.well-known/jwks.json).",
+                    )
+                claims = verify_rs256_jwt(
+                    token,
+                    jwks_url=jwks_url,
+                    issuer=JWT_ISSUER,
+                    audience=JWT_AUDIENCE,
+                )
+            else:
+                raise HTTPException(500, f"Unsupported ANKI_JWT_ALG={JWT_ALG!r}")
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(401, f"Invalid token: {e}")
 
@@ -206,9 +271,12 @@ class BackendManager:
             if tenant_id in self._items:
                 return self._items[tenant_id]
 
-            _, collection_path, media_folder_path, media_db_path = self._tenant_paths(
-                tenant_id
-            )
+            if RustBackend is None:
+                raise RuntimeError(
+                    "Anki RustBackend is not available (missing compiled extension). Run ./build_anki first."
+                )
+
+            _, collection_path, media_folder_path, media_db_path = self._tenant_paths(tenant_id)
 
             # Initialize backend per tenant.
             # Logging initialization is global-ish, but we can still point it at the
@@ -238,6 +306,12 @@ def get_bk(tenant_id: str = Depends(require_tenant_id)) -> TenantBackend:
 # FastAPI apps
 # -----------------------------
 api_app = FastAPI(title="Anki Web API")
+
+
+@api_app.get("/auth/whoami")
+def auth_whoami(tenant_id: str = Depends(require_tenant_id)) -> dict:
+    """Lightweight auth/tenant check endpoint (no Anki backend required)."""
+    return {"tenant_id": tenant_id, "auth_mode": AUTH_MODE, "jwt_alg": JWT_ALG}
 app = FastAPI(title="main app")
 
 # Set up CORS middleware
