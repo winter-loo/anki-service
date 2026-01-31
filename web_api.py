@@ -256,7 +256,7 @@ class BackendManager:
         self._guard = threading.Lock()
 
     def _tenant_paths(self, tenant_id: str) -> tuple[str, str, str, str]:
-        tenant_dir = os.path.join(self.base_dir, tenant_id)
+        tenant_dir = os.path.abspath(os.path.join(self.base_dir, tenant_id))
         _ensure_dir(tenant_dir)
         collection_path = os.path.join(tenant_dir, "collection.anki2")
         media_folder_path = os.path.join(tenant_dir, "collection.media")
