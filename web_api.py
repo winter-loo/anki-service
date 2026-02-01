@@ -728,5 +728,22 @@ def explain_word(text: str, model: str = "gemini-2.5-flash-lite"):
     return result
 
 
+@app.get("/ui-config.json")
+def ui_config() -> dict:
+    """Expose safe public config needed by the static UI.
+
+    Keep this endpoint free of secrets.
+    """
+    return {
+        "supabaseUrl": os.environ.get("PUBLIC_SUPABASE_URL")
+        or os.environ.get("SUPABASE_PROJECT_URL")
+        or "",
+        "supabasePublishableKey": os.environ.get("PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY")
+        or os.environ.get("SUPABASE_PUBLISHABLE_KEY")
+        or os.environ.get("SUPABASE_ANON_KEY")
+        or "",
+    }
+
+
 app.mount("/api", api_app)
 app.mount("/", StaticFiles(directory="ui/web", html=True), name="ui")

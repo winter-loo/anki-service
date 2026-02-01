@@ -1,3 +1,100 @@
+// Auth + API wrapper
+let __authReady = false;
+let __accessToken = null;
+
+async function apiFetch(path, options = {}) {
+  const headers = new Headers(options.headers || {});
+  if (__accessToken) headers.set('Authorization', 'Bearer ' + __accessToken);
+  const res = await fetch(path, { ...options, headers });
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    throw new Error(`HTTP ${res.status}: ${t}`);
+  }
+  return res;
+}
+
+function showAuthUI() {
+  document.getElementById('app')?.classList.add('hidden');
+  document.getElementById('auth')?.classList.remove('hidden');
+}
+function showAppUI() {
+  document.getElementById('auth')?.classList.add('hidden');
+  document.getElementById('app')?.classList.remove('hidden');
+}
+
+async function initSupabaseAuth() {
+  // auth.js exposes window.__auth
+  const { initAuth } = await import('./auth.js');
+  const { supabase, getAccessToken } = await initAuth();
+
+  const authOut = document.getElementById('authOut');
+  const logAuth = (x) => {
+    if (!authOut) return;
+    authOut.textContent = typeof x === 'string' ? x : JSON.stringify(x, null, 2);
+  };
+
+  async function refreshTokenAndUI() {
+    __accessToken = await getAccessToken();
+    if (!__accessToken) {
+      showAuthUI();
+      return false;
+    }
+    // display user id (sub) as quick sanity check
+    try {
+      const who = await (await apiFetch('/api/auth/whoami')).json();
+      const badge = document.getElementById('userBadge');
+      if (badge) badge.textContent = `user: ${who.user_id}`;
+    } catch {}
+    showAppUI();
+    return true;
+  }
+
+  // Wire buttons
+  document.getElementById('signin')?.addEventListener('click', async () => {
+    try {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      await refreshTokenAndUI();
+    } catch (e) {
+      logAuth(String(e?.message || e));
+    }
+  });
+
+  document.getElementById('signinGoogle')?.addEventListener('click', async () => {
+    try {
+      const redirectTo = window.location.origin + window.location.pathname;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo },
+      });
+      if (error) throw error;
+    } catch (e) {
+      logAuth(String(e?.message || e));
+    }
+  });
+
+  document.getElementById('signout')?.addEventListener('click', async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      __accessToken = null;
+      showAuthUI();
+    } catch (e) {
+      logAuth(String(e?.message || e));
+    }
+  });
+
+  supabase.auth.onAuthStateChange(async () => {
+    await refreshTokenAndUI();
+  });
+
+  const ok = await refreshTokenAndUI();
+  __authReady = true;
+  return ok;
+}
+
 // Select ordered list element
 const noteListEl = document.querySelector('.notes ol');
 const noteEditorEl = document.querySelector('.note-editor');
@@ -27,14 +124,14 @@ const cacheUpdateNote = (note_id, user_note) => {
 }
 
 const apiGetNote = async (note_id) => {
-  const res = await fetch(`/api/note/@${note_id}`);
+  const res = await apiFetch(`/api/note/@${note_id}`);
   const data = await res.json();
   return data;
 };
 
 // `user_note` only contains `fields` property
 const apiUpdateNote = async (note_id, user_note) => {
-  const res = await fetch(`/api/note/update/@${note_id}`, {
+  const res = await apiFetch(`/api/note/update/@${note_id}`, {
     method: 'POST',
     headers: {
       "Content-Type": "application/json",
@@ -92,7 +189,7 @@ const addNoteListItem = (note) => {
   deleteBtn.classList = 'delete-note-btn absolute top-0 right-0 mt-2 mr-2 text-gray-600 hover:text-red-600';
   deleteBtn.innerHTML = '<svg class="fill-current w-4 h-4" viewBox="0 0 20 20"><path d="M10 12.59l4.95 4.95a1 1 0 1 0 1.42-1.42L11.42 11 16.37 6.05a1 1 0 1 0-1.42-1.42L10 9.59 5.05 4.63a1 1 0 1 0-1.42 1.42L8.58 11 3.63 15.95a1 1 0 1 0 1.42 1.42L10 12.59z"/></svg>';
   deleteBtn.addEventListener('click', async () => {
-    await fetch(`/api/note/delete/@${note.id}`, { method: 'POST' });
+    await apiFetch(`/api/note/delete/@${note.id}`, { method: 'POST' });
     li.remove();
     // clear content of note editor
     if (noteEditorEl.dataset.noteId == note.id) {
@@ -127,7 +224,7 @@ const addNoteListItem = (note) => {
 }
 
 const list_notes = async () => {
-  const res = await fetch('/api/note/list');
+  const res = await apiFetch('/api/note/list');
   const data = await res.json();
   // Clear existing list
   noteListEl.innerHTML = ''; 
@@ -137,7 +234,6 @@ const list_notes = async () => {
     addNoteListItem(item);
   });
 }
-list_notes();
 
 
 async function showNextCard() {
@@ -149,7 +245,7 @@ async function showNextCard() {
   backEl.classList.remove('h-2/3');
   backEl.classList.add('h-0');
 
-  const res = await fetch('/api/card/next');
+  const res = await apiFetch('/api/card/next');
   const data = await res.json();
   if (data.cards == undefined || data.cards.length == 0) {
     cardEl.dataset.cardId = '';
@@ -158,14 +254,13 @@ async function showNextCard() {
     return;
   }
   const top_card = data.cards[0].card;
-  const noteRes = await fetch(`/api/note/@${top_card.noteId}`);
+  const noteRes = await apiFetch(`/api/note/@${top_card.noteId}`);
   const note = await noteRes.json();
   cardEl.dataset.cardId = top_card.id;
   cardEl.dataset.noteId = top_card.noteId;
   frontEl.querySelector('span').textContent = note.fields[0];
   backEl.querySelector('span').textContent = note.fields[1];
 }
-showNextCard();
 
 
 const blink = (el) => {
@@ -180,7 +275,7 @@ const blink = (el) => {
 document.querySelectorAll('.answer-btn').forEach(btn => {
   btn.addEventListener('click', async () => {
     const number = btn.querySelector('.shortcut').textContent;
-    await fetch(`/api/card/answer/${number}`, { method: 'POST' });
+    await apiFetch(`/api/card/answer/${number}`, { method: 'POST' });
     showNextCard();
   });
 });
@@ -199,7 +294,7 @@ document.addEventListener('keyup', async e => {
     buttons[e.key-1].classList.remove('blink')
     blink(buttons[e.key-1]);
 
-    await fetch(`/api/card/answer/${e.key}`, { method: 'POST' });
+    await apiFetch(`/api/card/answer/${e.key}`, { method: 'POST' });
     showNextCard();
   }
 });
@@ -213,7 +308,7 @@ const addNote = async () => {
       subNoteEl.value
     ]
   };
-  const res = await fetch('/api/note/add', {
+  const res = await apiFetch('/api/note/add', {
     method: 'POST',
     headers: {
       "Content-Type": "application/json",
@@ -324,3 +419,18 @@ cardEl.addEventListener('click', () => {
     cardBackEl.classList.toggle('h-0');
   }
 });
+
+// Boot
+(async () => {
+  try {
+    await initSupabaseAuth();
+    if (!__accessToken) return;
+    await list_notes();
+    await showNextCard();
+  } catch (e) {
+    console.error(e);
+    showAuthUI();
+    const authOut = document.getElementById('authOut');
+    if (authOut) authOut.textContent = String(e?.message || e);
+  }
+})();
