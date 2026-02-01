@@ -33,23 +33,16 @@ from dataclasses import dataclass
 
 
 # -----------------------------
-# Multi-tenancy + Auth (best practice)
+# Multi-user + Auth
 # -----------------------------
 #
-# The frontend (e.g. Better Auth) should authenticate the user and call this API with
+# Clients call this API with:
 #   Authorization: Bearer <token>
 #
-# This service then maps the authenticated user/org to a *tenant*, and uses a separate
-# Anki collection per tenant:
-#   tenants/<tenant_id>/collection.anki2
-#   tenants/<tenant_id>/collection.media/
-#
-# NOTE: Proper JWT signature verification depends on your auth provider (issuer/JWKS/etc).
-# This implementation supports:
-# - Production: set ANKI_AUTH_MODE=jwt and plug in your verifier later
-# - Development: set ANKI_AUTH_MODE=dev_header and send X-User-Id
-#
-# In all cases, we never trust an arbitrary tenant header unless explicitly enabled.
+# Supported auth modes:
+# - dev_header: trust X-User-Id (local dev only)
+# - jwt: generic JWT verification (RS256/JWKS or HS256)
+# - supabase: convenience wrapper around jwt mode with Supabase defaults
 
 AUTH_MODE = os.environ.get("ANKI_AUTH_MODE", "dev_header")
 # Storage base directory (attach a persistent volume here in production)
@@ -60,16 +53,30 @@ DEFAULT_COLLECTION_ID = os.environ.get("ANKI_DEFAULT_COLLECTION_ID", "default")
 #
 # Default: RS256 + JWKS (recommended for production)
 #
-# Env vars:
+# Env vars (generic JWT mode):
 # - ANKI_JWT_ALG: RS256 (default) or HS256
 # - ANKI_JWKS_URL: JWKS endpoint URL (if RS256). If not set, we derive it from issuer:
 #     <issuer>/.well-known/jwks.json
-# - ANKI_JWT_ISSUER (or BETTER_AUTH_URL)
+# - ANKI_JWT_ISSUER
 # - ANKI_JWT_AUDIENCE (optional)
-# - ANKI_JWT_HS256_SECRET (or BETTER_AUTH_SECRET) if HS256
-JWT_ALG = (os.environ.get("ANKI_JWT_ALG") or "RS256").upper()
-JWT_HS256_SECRET = os.environ.get("ANKI_JWT_HS256_SECRET") or os.environ.get("BETTER_AUTH_SECRET")
-JWT_ISSUER = os.environ.get("ANKI_JWT_ISSUER") or os.environ.get("BETTER_AUTH_URL")
+# - ANKI_JWT_HS256_SECRET if HS256
+#
+# Env vars (Supabase mode):
+# - SUPABASE_PROJECT_URL=https://<ref>.supabase.co
+#   -> issuer defaults to ${SUPABASE_PROJECT_URL}/auth/v1
+#   -> jwks defaults to ${issuer}/.well-known/jwks.json
+# - SUPABASE_JWT_ISSUER (override)
+# - SUPABASE_JWKS_URL (override)
+# - SUPABASE_JWT_AUDIENCE (default: authenticated)
+JWT_ALG = (os.environ.get("ANKI_JWT_ALG") or os.environ.get("ANKI_JWT_ALG_SUPABASE") or "RS256").upper()
+JWT_HS256_SECRET = os.environ.get("ANKI_JWT_HS256_SECRET")
+
+SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_PROJECT_URL")
+SUPABASE_ISSUER = os.environ.get("SUPABASE_JWT_ISSUER")
+SUPABASE_AUDIENCE = os.environ.get("SUPABASE_JWT_AUDIENCE") or "authenticated"
+SUPABASE_JWKS_URL = os.environ.get("SUPABASE_JWKS_URL")
+
+JWT_ISSUER = os.environ.get("ANKI_JWT_ISSUER")
 JWT_AUDIENCE = os.environ.get("ANKI_JWT_AUDIENCE")
 JWT_JWKS_URL = os.environ.get("ANKI_JWKS_URL")
 
@@ -177,6 +184,12 @@ def _default_jwks_url(issuer: str | None) -> str | None:
     return issuer.rstrip("/") + "/.well-known/jwks.json"
 
 
+def _supabase_default_issuer(project_url: str | None) -> str | None:
+    if not project_url:
+        return None
+    return project_url.rstrip("/") + "/auth/v1"
+
+
 def verify_rs256_jwt(token: str, *, jwks_url: str, issuer: str | None, audience: str | None) -> dict:
     """Verify an RS256 JWT via JWKS.
 
@@ -217,48 +230,57 @@ def require_user_id(
             raise HTTPException(401, "Missing X-User-Id (dev mode)")
         return x_user_id
 
-    if AUTH_MODE == "jwt":
+    def _verify_with(issuer: str | None, audience: str | None, jwks_url: str | None) -> dict:
+        if JWT_ALG == "HS256":
+            if not JWT_HS256_SECRET:
+                raise HTTPException(
+                    500,
+                    "JWT auth enabled (HS256) but no secret configured. Set ANKI_JWT_HS256_SECRET.",
+                )
+            return verify_hs256_jwt(token, secret=JWT_HS256_SECRET, issuer=issuer, audience=audience)
+
+        if JWT_ALG == "RS256":
+            resolved_jwks = jwks_url or _default_jwks_url(issuer)
+            if not resolved_jwks:
+                raise HTTPException(500, "JWT auth enabled (RS256) but no JWKS URL configured.")
+            return verify_rs256_jwt(token, jwks_url=resolved_jwks, issuer=issuer, audience=audience)
+
+        raise HTTPException(500, f"Unsupported ANKI_JWT_ALG={JWT_ALG!r}")
+
+    if AUTH_MODE in ("jwt", "supabase"):
         if not authorization or not authorization.lower().startswith("bearer "):
             raise HTTPException(401, "Missing Bearer token")
         token = authorization.split(" ", 1)[1].strip()
 
         try:
-            if JWT_ALG == "HS256":
-                if not JWT_HS256_SECRET:
+            if AUTH_MODE == "supabase":
+                issuer = SUPABASE_ISSUER or _supabase_default_issuer(SUPABASE_PROJECT_URL)
+                if not issuer:
                     raise HTTPException(
                         500,
-                        "JWT auth enabled (HS256) but no secret configured. Set ANKI_JWT_HS256_SECRET (or BETTER_AUTH_SECRET).",
+                        "Supabase auth enabled but issuer is not configured. Set SUPABASE_PROJECT_URL or SUPABASE_JWT_ISSUER.",
                     )
-                claims = verify_hs256_jwt(
-                    token,
-                    secret=JWT_HS256_SECRET,
-                    issuer=JWT_ISSUER,
-                    audience=JWT_AUDIENCE,
-                )
-            elif JWT_ALG == "RS256":
-                jwks_url = JWT_JWKS_URL or _default_jwks_url(JWT_ISSUER)
-                if not jwks_url:
-                    raise HTTPException(
-                        500,
-                        "JWT auth enabled (RS256) but no JWKS URL configured. Set ANKI_JWKS_URL (or ANKI_JWT_ISSUER/BETTER_AUTH_URL to derive /.well-known/jwks.json).",
-                    )
-                claims = verify_rs256_jwt(
-                    token,
-                    jwks_url=jwks_url,
-                    issuer=JWT_ISSUER,
-                    audience=JWT_AUDIENCE,
+                claims = _verify_with(
+                    issuer=issuer,
+                    audience=SUPABASE_AUDIENCE,
+                    jwks_url=SUPABASE_JWKS_URL,
                 )
             else:
-                raise HTTPException(500, f"Unsupported ANKI_JWT_ALG={JWT_ALG!r}")
+                # generic jwt mode
+                claims = _verify_with(
+                    issuer=JWT_ISSUER,
+                    audience=JWT_AUDIENCE,
+                    jwks_url=JWT_JWKS_URL,
+                )
         except HTTPException:
             raise
         except Exception as e:
             raise HTTPException(401, f"Invalid token: {e}")
 
-        tenant_id = claims.get("sub")
-        if not tenant_id:
+        user_id = claims.get("sub")
+        if not user_id:
             raise HTTPException(401, "Token missing 'sub'")
-        return str(tenant_id)
+        return str(user_id)
 
     raise HTTPException(500, f"Unknown ANKI_AUTH_MODE={AUTH_MODE!r}")
 
