@@ -11,7 +11,8 @@ set -euo pipefail
 #
 # Required env vars:
 #   SUPABASE_PROJECT_URL=https://<ref>.supabase.co
-#   SUPABASE_ANON_KEY=<your anon public key>
+#   SUPABASE_PUBLISHABLE_KEY=<Supabase publishable key>
+#     (Older name SUPABASE_ANON_KEY is also accepted for compatibility)
 #   SUPABASE_TEST_EMAIL=<email>
 #   SUPABASE_TEST_PASSWORD=<password>
 # Optional:
@@ -20,7 +21,15 @@ set -euo pipefail
 
 ANKI_SERVICE_URL=${ANKI_SERVICE_URL:-http://127.0.0.1:8000}
 SUPABASE_PROJECT_URL=${SUPABASE_PROJECT_URL:?missing SUPABASE_PROJECT_URL}
-SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:?missing SUPABASE_ANON_KEY}
+
+# Supabase renamed keys: anon/public -> publishable.
+# Accept both names to keep setup friction low.
+SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY:-${SUPABASE_ANON_KEY:-}}
+if [[ -z "$SUPABASE_PUBLISHABLE_KEY" ]]; then
+  echo "missing SUPABASE_PUBLISHABLE_KEY (or legacy SUPABASE_ANON_KEY)" >&2
+  exit 1
+fi
+
 SUPABASE_TEST_EMAIL=${SUPABASE_TEST_EMAIL:?missing SUPABASE_TEST_EMAIL}
 SUPABASE_TEST_PASSWORD=${SUPABASE_TEST_PASSWORD:?missing SUPABASE_TEST_PASSWORD}
 
@@ -66,7 +75,8 @@ wait_http_status "$ANKI_SERVICE_URL/api/auth/whoami" "200,401" 120
 
 # Get a Supabase access token via password grant
 TOKEN_JSON=$(curl -fsS \
-  -H "apikey: $SUPABASE_ANON_KEY" \
+  -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_PUBLISHABLE_KEY" \
   -H "content-type: application/json" \
   -d "{\"email\":\"$SUPABASE_TEST_EMAIL\",\"password\":\"$SUPABASE_TEST_PASSWORD\"}" \
   "$SUPABASE_PROJECT_URL/auth/v1/token?grant_type=password")
