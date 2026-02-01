@@ -86,7 +86,7 @@ def test_rs256_jwks_auth_whoami():
     r = client.get("/auth/whoami", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200, r.text
     data = r.json()
-    assert data["tenant_id"] == "tenant-123"
+    assert data["user_id"] == "tenant-123"
     assert data["jwt_alg"] == "RS256"
 
     server.shutdown()

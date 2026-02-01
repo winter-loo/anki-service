@@ -51,7 +51,9 @@ from dataclasses import dataclass
 # In all cases, we never trust an arbitrary tenant header unless explicitly enabled.
 
 AUTH_MODE = os.environ.get("ANKI_AUTH_MODE", "dev_header")
-TENANT_BASE_DIR = os.environ.get("ANKI_TENANT_BASE_DIR", "tenants")
+# Storage base directory (attach a persistent volume here in production)
+DATA_DIR = os.environ.get("ANKI_DATA_DIR", os.environ.get("ANKI_TENANT_BASE_DIR", "tenants"))
+DEFAULT_COLLECTION_ID = os.environ.get("ANKI_DEFAULT_COLLECTION_ID", "default")
 
 # JWT verification settings.
 #
@@ -73,6 +75,26 @@ JWT_JWKS_URL = os.environ.get("ANKI_JWKS_URL")
 
 def _ensure_dir(path: str) -> None:
     os.makedirs(path, exist_ok=True)
+
+
+def _safe_id(value: str, *, what: str) -> str:
+    """Validate a path component id (prevents traversal)."""
+    if not value:
+        raise ValueError(f"missing {what}")
+    # Keep it simple: allow UUIDs and common slugs.
+    # (No slashes, no dots-only, no spaces)
+    allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.")
+    if any(ch not in allowed for ch in value):
+        raise ValueError(f"invalid {what}: {value!r}")
+    if "/" in value or "\\" in value or value in (".", ".."):
+        raise ValueError(f"invalid {what}: {value!r}")
+    return value
+
+
+def _user_collection_dir(user_id: str, collection_id: str) -> str:
+    user_id = _safe_id(user_id, what="user_id")
+    collection_id = _safe_id(collection_id, what="collection_id")
+    return os.path.abspath(os.path.join(DATA_DIR, "users", user_id, "collections", collection_id))
 
 
 def _urlsafe_b64decode(data: str) -> bytes:
@@ -179,11 +201,11 @@ def verify_rs256_jwt(token: str, *, jwks_url: str, issuer: str | None, audience:
     )
 
 
-def require_tenant_id(
+def require_user_id(
     authorization: str | None = Header(default=None),
     x_user_id: str | None = Header(default=None),
 ) -> str:
-    """Resolve tenant id from an authenticated identity.
+    """Resolve user id from an authenticated identity.
 
     Best practice: Authorization Bearer token -> verified -> subject claim (sub).
 
@@ -247,36 +269,36 @@ class TenantBackend:
 
 
 class BackendManager:
-    """Caches a RustBackend per tenant and protects SQLite access with a lock."""
+    """Caches a RustBackend per (user_id, collection_id) and protects SQLite access with a lock."""
 
-    def __init__(self, base_dir: str) -> None:
-        self.base_dir = base_dir
-        _ensure_dir(self.base_dir)
-        self._items: dict[str, TenantBackend] = {}
+    def __init__(self) -> None:
+        _ensure_dir(DATA_DIR)
+        self._items: dict[tuple[str, str], TenantBackend] = {}
         self._guard = threading.Lock()
 
-    def _tenant_paths(self, tenant_id: str) -> tuple[str, str, str, str]:
-        tenant_dir = os.path.abspath(os.path.join(self.base_dir, tenant_id))
-        _ensure_dir(tenant_dir)
-        collection_path = os.path.join(tenant_dir, "collection.anki2")
-        media_folder_path = os.path.join(tenant_dir, "collection.media")
-        media_db_path = os.path.join(tenant_dir, "collection.media.db2")
-        log_dir = os.path.join(tenant_dir, "log")
+    def _collection_paths(self, user_id: str, collection_id: str) -> tuple[str, str, str, str]:
+        col_dir = _user_collection_dir(user_id, collection_id)
+        _ensure_dir(col_dir)
+        collection_path = os.path.join(col_dir, "collection.anki2")
+        media_folder_path = os.path.join(col_dir, "collection.media")
+        media_db_path = os.path.join(col_dir, "collection.media.db2")
+        log_dir = os.path.join(col_dir, "log")
         _ensure_dir(media_folder_path)
         _ensure_dir(log_dir)
-        return tenant_dir, collection_path, media_folder_path, media_db_path
+        return col_dir, collection_path, media_folder_path, media_db_path
 
-    def get(self, tenant_id: str) -> TenantBackend:
+    def get(self, user_id: str, collection_id: str) -> TenantBackend:
+        key = (str(user_id), str(collection_id))
         with self._guard:
-            if tenant_id in self._items:
-                return self._items[tenant_id]
+            if key in self._items:
+                return self._items[key]
 
             if RustBackend is None:
                 raise RuntimeError(
                     "Anki RustBackend is not available (missing compiled extension). Run ./build_anki first."
                 )
 
-            tenant_dir, collection_path, media_folder_path, media_db_path = self._tenant_paths(tenant_id)
+            col_dir, collection_path, media_folder_path, media_db_path = self._collection_paths(user_id, collection_id)
 
             # Initialize backend per tenant.
             # Logging initialization is global-ish, but we can still point it at the
@@ -293,15 +315,29 @@ class BackendManager:
             )
 
             item = TenantBackend(backend=bk, lock=threading.Lock())
-            self._items[tenant_id] = item
+            self._items[key] = item
             return item
 
 
-backend_manager = BackendManager(TENANT_BASE_DIR)
+backend_manager = BackendManager()
 
 
-def get_bk(tenant_id: str = Depends(require_tenant_id)) -> TenantBackend:
-    return backend_manager.get(tenant_id)
+def require_collection_id(x_collection_id: str | None = Header(default=None)) -> str:
+    """Resolve collection id.
+
+    For multi-collection support we take it from a header. This avoids duplicating every API route
+    under a path prefix.
+
+    Default: "default".
+    """
+    return x_collection_id or DEFAULT_COLLECTION_ID
+
+
+def get_bk(
+    user_id: str = Depends(require_user_id),
+    collection_id: str = Depends(require_collection_id),
+) -> TenantBackend:
+    return backend_manager.get(user_id, collection_id)
 
 
 # -----------------------------
@@ -311,9 +347,17 @@ api_app = FastAPI(title="Anki Web API")
 
 
 @api_app.get("/auth/whoami")
-def auth_whoami(tenant_id: str = Depends(require_tenant_id)) -> dict:
-    """Lightweight auth/tenant check endpoint (no Anki backend required)."""
-    return {"tenant_id": tenant_id, "auth_mode": AUTH_MODE, "jwt_alg": JWT_ALG}
+def auth_whoami(
+    user_id: str = Depends(require_user_id),
+    collection_id: str = Depends(require_collection_id),
+) -> dict:
+    """Lightweight auth check endpoint (no Anki backend required)."""
+    return {
+        "user_id": user_id,
+        "collection_id": collection_id,
+        "auth_mode": AUTH_MODE,
+        "jwt_alg": JWT_ALG,
+    }
 app = FastAPI(title="main app")
 
 # Set up CORS middleware
