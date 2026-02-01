@@ -76,13 +76,29 @@ async function initSupabaseAuth() {
   });
 
   document.getElementById('signout')?.addEventListener('click', async () => {
+    const btn = document.getElementById('signout');
     try {
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Signing out…';
+      }
+
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+
       __accessToken = null;
       showAuthUI();
+      logAuth({ signedOut: true });
+
+      // Best-effort: if something cached, force-refresh our UI state.
+      setTimeout(() => refreshTokenAndUI().catch(() => {}), 300);
     } catch (e) {
       logAuth(String(e?.message || e));
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Sign out';
+      }
     }
   });
 
