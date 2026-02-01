@@ -81,6 +81,8 @@ SUPABASE_JWKS_URL = os.environ.get("SUPABASE_JWKS_URL")
 JWT_ISSUER = os.environ.get("ANKI_JWT_ISSUER")
 JWT_AUDIENCE = os.environ.get("ANKI_JWT_AUDIENCE")
 JWT_JWKS_URL = os.environ.get("ANKI_JWKS_URL")
+# Leeway (seconds) for exp/nbf/iat checks to tolerate minor clock skew.
+JWT_LEEWAY = int(os.environ.get("ANKI_JWT_LEEWAY", "60"))
 
 
 def _ensure_dir(path: str) -> None:
@@ -224,6 +226,7 @@ def verify_jwt_via_jwks(
         algorithms=[alg],
         issuer=issuer,
         audience=audience,
+        leeway=JWT_LEEWAY,
         options={"verify_aud": bool(audience), "verify_iss": bool(issuer)},
     )
 
