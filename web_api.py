@@ -54,7 +54,7 @@ DEFAULT_COLLECTION_ID = os.environ.get("ANKI_DEFAULT_COLLECTION_ID", "default")
 # Default: RS256 + JWKS (recommended for production)
 #
 # Env vars (generic JWT mode):
-# - ANKI_JWT_ALG: RS256 (default) or HS256
+# - ANKI_JWT_ALG: RS256 (default), ES256, HS256, or AUTO (auto-detect RS256/ES256 from token header)
 # - ANKI_JWKS_URL: JWKS endpoint URL (if RS256). If not set, we derive it from issuer:
 #     <issuer>/.well-known/jwks.json
 # - ANKI_JWT_ISSUER
@@ -69,6 +69,8 @@ DEFAULT_COLLECTION_ID = os.environ.get("ANKI_DEFAULT_COLLECTION_ID", "default")
 # - SUPABASE_JWKS_URL (override)
 # - SUPABASE_JWT_AUDIENCE (default: authenticated)
 JWT_ALG = (os.environ.get("ANKI_JWT_ALG") or os.environ.get("ANKI_JWT_ALG_SUPABASE") or "RS256").upper()
+# AUTO => determine RS256/ES256 from token header at runtime.
+# Useful when the issuer rotates algorithms (e.g., newer Supabase projects default to ES256).
 JWT_HS256_SECRET = os.environ.get("ANKI_JWT_HS256_SECRET")
 
 SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_PROJECT_URL")
@@ -190,11 +192,22 @@ def _supabase_default_issuer(project_url: str | None) -> str | None:
     return project_url.rstrip("/") + "/auth/v1"
 
 
-def verify_rs256_jwt(token: str, *, jwks_url: str, issuer: str | None, audience: str | None) -> dict:
-    """Verify an RS256 JWT via JWKS.
+def verify_jwt_via_jwks(
+    token: str,
+    *,
+    jwks_url: str,
+    issuer: str | None,
+    audience: str | None,
+    alg: str,
+) -> dict:
+    """Verify an asymmetric JWT (RS256/ES256) via JWKS.
 
     Uses PyJWT's PyJWKClient to fetch + cache signing keys.
     """
+    alg = alg.upper()
+    if alg not in ("RS256", "ES256"):
+        raise ValueError(f"unsupported alg {alg!r} (expected RS256 or ES256)")
+
     try:
         import jwt
         from jwt import PyJWKClient
@@ -208,7 +221,7 @@ def verify_rs256_jwt(token: str, *, jwks_url: str, issuer: str | None, audience:
     return jwt.decode(
         token,
         signing_key,
-        algorithms=["RS256"],
+        algorithms=[alg],
         issuer=issuer,
         audience=audience,
         options={"verify_aud": bool(audience), "verify_iss": bool(issuer)},
@@ -239,11 +252,23 @@ def require_user_id(
                 )
             return verify_hs256_jwt(token, secret=JWT_HS256_SECRET, issuer=issuer, audience=audience)
 
-        if JWT_ALG == "RS256":
+        if JWT_ALG in ("RS256", "ES256", "AUTO"):
             resolved_jwks = jwks_url or _default_jwks_url(issuer)
             if not resolved_jwks:
-                raise HTTPException(500, "JWT auth enabled (RS256) but no JWKS URL configured.")
-            return verify_rs256_jwt(token, jwks_url=resolved_jwks, issuer=issuer, audience=audience)
+                raise HTTPException(500, "JWT auth enabled (RS256/ES256) but no JWKS URL configured.")
+
+            alg = JWT_ALG
+            if alg == "AUTO":
+                try:
+                    import jwt
+
+                    alg = (jwt.get_unverified_header(token) or {}).get("alg", "").upper()
+                except Exception:
+                    alg = ""
+                if alg not in ("RS256", "ES256"):
+                    raise HTTPException(401, f"Unsupported token alg {alg!r} in AUTO mode")
+
+            return verify_jwt_via_jwks(token, jwks_url=resolved_jwks, issuer=issuer, audience=audience, alg=alg)
 
         raise HTTPException(500, f"Unsupported ANKI_JWT_ALG={JWT_ALG!r}")
 
