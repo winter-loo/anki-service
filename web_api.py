@@ -456,8 +456,9 @@ def create_collection(
 ) -> dict:
     """Create a new collection directory for the user.
 
-    This does not require Anki RustBackend; the collection DB is created lazily
-    when the first Anki API call opens it.
+    The collection DB is created lazily when the first Anki API call opens it.
+    If you want to force-create/validate the collection immediately, use:
+      POST /collections/{collection_id}/init
     """
     # Choose id
     if req.collection_id:
@@ -486,6 +487,32 @@ def create_collection(
         pass
 
     return {"collection_id": cid, "meta": meta}
+
+
+@api_app.post("/collections/{collection_id}/init")
+def init_collection(
+    collection_id: str,
+    user_id: str = Depends(require_user_id),
+) -> dict:
+    """Force-initialize a collection by opening it via RustBackend.
+
+    Useful to validate the environment and ensure the underlying SQLite DB files exist.
+    """
+    cid = _safe_id(collection_id, what="collection_id")
+    if RustBackend is None:
+        raise HTTPException(500, "Anki RustBackend is not available. Run ./build_anki first.")
+
+    # Open/initialize backend (this will create collection.anki2 if missing)
+    tb = backend_manager.get(user_id, cid)
+    # Close it again to avoid keeping too many open collections around
+    backend_manager.evict(user_id, cid)
+
+    col_dir = _user_collection_dir(user_id, cid)
+    return {
+        "initialized": True,
+        "collection_id": cid,
+        "path": col_dir,
+    }
 
 
 @api_app.delete("/collections/{collection_id}")
