@@ -120,7 +120,8 @@ wait_http_status() {
   local ok_codes_csv="$2"  # e.g. "200,401"
   local tries=${3:-60}
   for _ in $(seq 1 "$tries"); do
-    code=$(curl -sS -o /dev/null -w "%{http_code}" "$url" || true)
+    # Silence connection errors while the server is still starting.
+    code=$(curl -sS -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || true)
     IFS=',' read -ra ok <<<"$ok_codes_csv"
     for c in "${ok[@]}"; do
       if [[ "$code" == "$c" ]]; then
