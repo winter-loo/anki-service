@@ -31,11 +31,17 @@ cd /home/ldd/anki-service/demo-better-auth-frontend
 npm install
 export BETTER_AUTH_URL='http://localhost:3000'
 export ANKI_SERVICE_URL='http://localhost:8000'
+
+# For /supabase.html demo page:
+export PUBLIC_SUPABASE_URL='https://<ref>.supabase.co'
+export PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY='sb_publishable_...'
+
 node server.mjs
 ```
 
 Then open:
-- http://localhost:3000
+- http://localhost:3000 (Better Auth demo)
+- http://localhost:3000/supabase.html (Supabase Auth demo)
 
 ## Google OAuth (optional)
 

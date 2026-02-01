@@ -5,6 +5,21 @@ import { auth } from "./auth.mjs";
 
 const app = express();
 app.use(express.json());
+
+// Small helper endpoint so the static demo pages can discover config from env vars.
+// Safe to expose: publishable key + project URL are public.
+app.get("/demo-config.json", (req, res) => {
+  res.json({
+    supabaseUrl: process.env.PUBLIC_SUPABASE_URL || process.env.SUPABASE_PROJECT_URL || null,
+    supabasePublishableKey:
+      process.env.PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ||
+      process.env.SUPABASE_PUBLISHABLE_KEY ||
+      process.env.SUPABASE_ANON_KEY ||
+      null,
+    ankiServiceUrl: process.env.ANKI_SERVICE_URL || "http://localhost:8000",
+  });
+});
+
 app.use(express.static("public"));
 
 // Mount Better Auth routes.
