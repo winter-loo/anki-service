@@ -3,8 +3,11 @@ let __authReady = false;
 let __accessToken = null;
 
 async function apiFetch(path, options = {}) {
+  if (!__accessToken) {
+    throw new Error('Not signed in');
+  }
   const headers = new Headers(options.headers || {});
-  if (__accessToken) headers.set('Authorization', 'Bearer ' + __accessToken);
+  headers.set('Authorization', 'Bearer ' + __accessToken);
   const res = await fetch(path, { ...options, headers });
   if (!res.ok) {
     const t = await res.text().catch(() => '');
@@ -14,8 +17,15 @@ async function apiFetch(path, options = {}) {
 }
 
 function showAuthUI() {
+  // Hide the app and make sure the login form is visible.
   document.getElementById('app')?.classList.add('hidden');
   document.getElementById('auth')?.classList.remove('hidden');
+
+  // Clear UI state so it doesn't look usable after sign-out.
+  const badge = document.getElementById('userBadge');
+  if (badge) badge.textContent = '';
+  const out = document.getElementById('authOut');
+  if (out && !out.textContent) out.textContent = 'Signed out.';
 }
 function showAppUI() {
   document.getElementById('auth')?.classList.add('hidden');
@@ -83,16 +93,25 @@ async function initSupabaseAuth() {
         btn.textContent = 'Signing out…';
       }
 
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-
+      // Immediately hide the app so it can't be used while signing out.
       __accessToken = null;
       showAuthUI();
+
+      // Prefer local sign-out for responsiveness.
+      const signOutPromise = supabase.auth.signOut({ scope: 'local' });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Sign out timed out')), 5000)
+      );
+      const result = await Promise.race([signOutPromise, timeoutPromise]);
+      const error = result?.error;
+      if (error) throw error;
+
       logAuth({ signedOut: true });
 
-      // Best-effort: if something cached, force-refresh our UI state.
+      // Best-effort: force-refresh our UI state.
       setTimeout(() => refreshTokenAndUI().catch(() => {}), 300);
     } catch (e) {
+      // Still keep user on login page; just show the error.
       logAuth(String(e?.message || e));
     } finally {
       if (btn) {
