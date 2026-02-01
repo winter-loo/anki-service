@@ -72,6 +72,39 @@ async function initSupabaseAuth() {
     }
   });
 
+  document.getElementById('signup')?.addEventListener('click', async () => {
+    try {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const redirectTo = window.location.origin + window.location.pathname;
+
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: redirectTo },
+      });
+      if (error) throw error;
+
+      // If email confirmations are ON, you may not get a session immediately.
+      // We show a helpful message either way.
+      const userId = data?.user?.id;
+      const hasSession = Boolean(data?.session?.access_token);
+      if (hasSession) {
+        logAuth({ signedUp: true, userId, session: 'created' });
+        await refreshTokenAndUI();
+      } else {
+        logAuth({
+          signedUp: true,
+          userId,
+          next: 'Check your email to confirm, then come back and Sign in.',
+          note: 'If you disabled email confirmations in Supabase, you can sign in immediately.'
+        });
+      }
+    } catch (e) {
+      logAuth(String(e?.message || e));
+    }
+  });
+
   document.getElementById('signinGoogle')?.addEventListener('click', async () => {
     try {
       const redirectTo = window.location.origin + window.location.pathname;
