@@ -56,9 +56,12 @@ free_port 3000
 # Start anki-service bound to tailscale IP (tailnet-only access)
 (
   cd "$ROOT_DIR"
+  # Tell anki-service how to validate demo RS256 tokens minted by the Better Auth demo.
   PYTHONPATH="$ROOT_DIR/out/pylib:$ROOT_DIR/pylib" \
     ANKI_AUTH_MODE=jwt \
     ANKI_JWT_ALG=RS256 \
+    ANKI_JWT_ISSUER="$BETTER_AUTH_URL" \
+    ANKI_JWKS_URL="$BETTER_AUTH_URL/.well-known/jwks.json" \
     BETTER_AUTH_URL="$BETTER_AUTH_URL" \
     "$ROOT_DIR/out/pyenv/bin/uvicorn" web_api:app --host "$TS_IP" --port 8000
 ) >/tmp/anki-service-tail.log 2>&1 &
