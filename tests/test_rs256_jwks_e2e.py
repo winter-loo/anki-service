@@ -79,6 +79,7 @@ def test_rs256_jwks_auth_whoami():
     sys.path.insert(0, os.path.abspath("."))
 
     web_api = importlib.import_module("web_api")
+    web_api = importlib.reload(web_api)
 
     from fastapi.testclient import TestClient
 

@@ -26,6 +26,7 @@ except Exception:  # pragma: no cover
 import base64
 import json
 import os
+import shutil
 import threading
 import time
 from dataclasses import dataclass
@@ -276,6 +277,21 @@ class BackendManager:
         self._items: dict[tuple[str, str], TenantBackend] = {}
         self._guard = threading.Lock()
 
+    def evict(self, user_id: str, collection_id: str) -> None:
+        """Remove a cached backend (best-effort close)."""
+        key = (str(user_id), str(collection_id))
+        tb: TenantBackend | None = None
+        with self._guard:
+            tb = self._items.pop(key, None)
+        if tb is not None:
+            try:
+                with tb.lock:
+                    # close_collection expects a bool argument
+                    tb.backend.close_collection(downgrade_to_schema11=False)
+            except Exception:
+                # Best-effort: don't crash deletion paths if closing fails.
+                pass
+
     def _collection_paths(self, user_id: str, collection_id: str) -> tuple[str, str, str, str]:
         col_dir = _user_collection_dir(user_id, collection_id)
         _ensure_dir(col_dir)
@@ -380,8 +396,103 @@ api_app.add_middleware(
 )
 
 
+@api_app.get("/collections")
+def list_collections(user_id: str = Depends(require_user_id)) -> list[dict]:
+    """List collections for the authenticated user (filesystem-backed)."""
+    base = os.path.join(DATA_DIR, "users", _safe_id(user_id, what="user_id"), "collections")
+    if not os.path.isdir(base):
+        return []
+
+    out: list[dict] = []
+    for name in sorted(os.listdir(base)):
+        full = os.path.join(base, name)
+        if not os.path.isdir(full):
+            continue
+        # validate dir name is a safe id
+        try:
+            cid = _safe_id(name, what="collection_id")
+        except Exception:
+            continue
+
+        meta_path = os.path.join(full, "meta.json")
+        meta = None
+        if os.path.isfile(meta_path):
+            try:
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
+            except Exception:
+                meta = None
+
+        out.append({"collection_id": cid, "meta": meta})
+    return out
+
+
+@api_app.post("/collections")
+def create_collection(
+    req: CreateCollectionRequest,
+    user_id: str = Depends(require_user_id),
+) -> dict:
+    """Create a new collection directory for the user.
+
+    This does not require Anki RustBackend; the collection DB is created lazily
+    when the first Anki API call opens it.
+    """
+    # Choose id
+    if req.collection_id:
+        cid = _safe_id(req.collection_id, what="collection_id")
+    else:
+        # short random id
+        cid = base64.urlsafe_b64encode(os.urandom(9)).decode("utf-8").rstrip("=")
+        cid = _safe_id(cid, what="collection_id")
+
+    col_dir = _user_collection_dir(user_id, cid)
+    if os.path.exists(col_dir):
+        raise HTTPException(409, "collection already exists")
+
+    _ensure_dir(col_dir)
+    _ensure_dir(os.path.join(col_dir, "collection.media"))
+
+    meta = {
+        "name": req.name or cid,
+        "created_at": int(time.time()),
+    }
+    try:
+        with open(os.path.join(col_dir, "meta.json"), "w", encoding="utf-8") as f:
+            json.dump(meta, f)
+    except Exception:
+        # meta is optional
+        pass
+
+    return {"collection_id": cid, "meta": meta}
+
+
+@api_app.delete("/collections/{collection_id}")
+def delete_collection(
+    collection_id: str,
+    user_id: str = Depends(require_user_id),
+) -> dict:
+    """Delete a collection directory.
+
+    Best-effort closes any cached backend first.
+    """
+    cid = _safe_id(collection_id, what="collection_id")
+    backend_manager.evict(user_id, cid)
+
+    col_dir = _user_collection_dir(user_id, cid)
+    if not os.path.isdir(col_dir):
+        raise HTTPException(404, "collection not found")
+
+    shutil.rmtree(col_dir)
+    return {"deleted": True, "collection_id": cid}
+
+
 class UserNote(BaseModel):
     fields: list[str]
+
+
+class CreateCollectionRequest(BaseModel):
+    collection_id: str | None = None
+    name: str | None = None
 
 
 @api_app.get("/note/list")
