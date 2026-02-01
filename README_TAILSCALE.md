@@ -15,6 +15,8 @@ Goal:
 
 ## Start
 
+### Option 1: Better Auth demo (Google OAuth)
+
 Set env vars:
 
 ```bash
@@ -28,6 +30,27 @@ Run:
 cd /home/ldd/anki-service
 ./run_demo_tailscale.sh
 ```
+
+### Option 2: Supabase Auth demo (recommended)
+
+Set env vars:
+
+```bash
+export PUBLIC_SUPABASE_URL='https://<ref>.supabase.co'
+export PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY='sb_publishable_...'
+```
+
+Run:
+
+```bash
+cd /home/ldd/anki-service
+./run_supabase_tailscale.sh
+```
+
+Then open on your phone:
+- `${FUNNEL_URL}/supabase.html`
+
+Note: the demo page calls anki-service at `http://<tailscale-ip>:8000`, so your phone must be on the **tailnet** (Tailscale connected) for the API calls to succeed.
 
 ## Proxy for tailscaled (optional)
 
