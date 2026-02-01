@@ -78,6 +78,9 @@ SUPABASE_ISSUER = os.environ.get("SUPABASE_JWT_ISSUER")
 SUPABASE_AUDIENCE = os.environ.get("SUPABASE_JWT_AUDIENCE") or "authenticated"
 SUPABASE_JWKS_URL = os.environ.get("SUPABASE_JWKS_URL")
 
+# Server-side admin key (keep secret). Used only for optional signup policy/metrics.
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+
 JWT_ISSUER = os.environ.get("ANKI_JWT_ISSUER")
 JWT_AUDIENCE = os.environ.get("ANKI_JWT_AUDIENCE")
 JWT_JWKS_URL = os.environ.get("ANKI_JWKS_URL")
@@ -424,6 +427,107 @@ def auth_whoami(
         "auth_mode": AUTH_MODE,
         "jwt_alg": JWT_ALG,
     }
+
+
+class SignupRequest(BaseModel):
+    email: str
+    password: str
+
+
+def _supabase_admin_request(path: str, *, method: str = "GET", json_body: dict | None = None) -> tuple[int, dict, dict]:
+    """Minimal Supabase Auth admin REST helper.
+
+    Returns (status_code, headers_lower, json_data).
+    """
+    if not SUPABASE_PROJECT_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        raise HTTPException(500, "Supabase admin is not configured (set SUPABASE_PROJECT_URL and SUPABASE_SERVICE_ROLE_KEY)")
+
+    import urllib.request
+    import urllib.error
+
+    url = SUPABASE_PROJECT_URL.rstrip("/") + path
+    body = None
+    if json_body is not None:
+        body = json.dumps(json_body).encode("utf-8")
+
+    req = urllib.request.Request(url, data=body, method=method)
+    req.add_header("apikey", SUPABASE_SERVICE_ROLE_KEY)
+    req.add_header("Authorization", f"Bearer {SUPABASE_SERVICE_ROLE_KEY}")
+    req.add_header("content-type", "application/json")
+
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            raw = resp.read().decode("utf-8")
+            data = json.loads(raw) if raw else {}
+            headers = {k.lower(): v for k, v in resp.headers.items()}
+            return resp.status, headers, data
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8") if hasattr(e, "read") else ""
+        try:
+            data = json.loads(raw) if raw else {}
+        except Exception:
+            data = {"error": raw}
+        headers = {k.lower(): v for k, v in (e.headers.items() if e.headers else [])}
+        return int(getattr(e, "code", 500)), headers, data
+
+
+def _supabase_user_count() -> int:
+    """Return current number of users in Supabase Auth.
+
+    We try to read total from Content-Range if present; otherwise we fall back to paging.
+    """
+    # Try: per_page=1 and parse Content-Range total, if provided.
+    status, headers, data = _supabase_admin_request("/auth/v1/admin/users?page=1&per_page=1")
+    if status >= 400:
+        raise HTTPException(500, f"Supabase admin users list failed: {data}")
+
+    cr = headers.get("content-range") or headers.get("content_range")
+    if cr and "/" in cr:
+        try:
+            return int(cr.split("/", 1)[1])
+        except Exception:
+            pass
+
+    # Fallback: page until empty (stop early once >1001)
+    total = 0
+    page = 1
+    per_page = 200
+    while True:
+        status, _, items = _supabase_admin_request(f"/auth/v1/admin/users?page={page}&per_page={per_page}")
+        if status >= 400:
+            raise HTTPException(500, f"Supabase admin users list failed: {items}")
+        if not isinstance(items, list) or len(items) == 0:
+            break
+        total += len(items)
+        if total > 1100:
+            break
+        page += 1
+    return total
+
+
+@api_app.post("/public/signup")
+def public_signup(req: SignupRequest) -> dict:
+    """Controlled signup policy:
+
+    - If user_count <= 1001: create user via admin API with email_confirm=true (no email confirmation needed).
+    - If user_count > 1001: require email confirmation (client should use normal Supabase signUp).
+
+    NOTE: For the >1001 case to work, enable "Confirm email" in Supabase Auth settings.
+    """
+    count = _supabase_user_count()
+    if count > 1001:
+        return {"mode": "require_email_confirm", "user_count": count, "threshold": 1001}
+
+    status, _, data = _supabase_admin_request(
+        "/auth/v1/admin/users",
+        method="POST",
+        json_body={"email": req.email, "password": req.password, "email_confirm": True},
+    )
+    if status >= 400:
+        # pass through useful error
+        raise HTTPException(400, f"admin create user failed: {data}")
+
+    return {"mode": "created_confirmed", "user_count": count, "threshold": 1001, "user_id": data.get("id")}
 app = FastAPI(title="main app")
 
 # Set up CORS middleware

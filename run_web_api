@@ -28,6 +28,14 @@ if [[ -n "${PUBLIC_SUPABASE_URL:-}" && -n "${PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT
   # Used by /ui-config.json for the static UI.
   export PUBLIC_SUPABASE_URL
   export PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY
+
+  # Optional: service role key (server-side only) for admin ops like user counting/auto-confirm.
+  # supabase.txt stores it as SECRET_KEYS.
+  if [[ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
+    export SUPABASE_SERVICE_ROLE_KEY
+  elif [[ -n "${SECRET_KEYS:-}" ]]; then
+    export SUPABASE_SERVICE_ROLE_KEY="$SECRET_KEYS"
+  fi
 else
   echo "[run_web_api] Supabase env not found; starting in dev_header mode." >&2
   echo "[run_web_api] To enable Supabase auth, set PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY" >&2

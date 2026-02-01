@@ -24,8 +24,7 @@ function showAuthUI() {
   // Clear UI state so it doesn't look usable after sign-out.
   const badge = document.getElementById('userBadge');
   if (badge) badge.textContent = '';
-  const out = document.getElementById('authOut');
-  if (out && !out.textContent) out.textContent = 'Signed out.';
+  // Do NOT write "Signed out" here: this runs on initial load when not logged in.
 }
 function showAppUI() {
   document.getElementById('auth')?.classList.add('hidden');
@@ -78,6 +77,33 @@ async function initSupabaseAuth() {
       const password = document.getElementById('password').value;
       const redirectTo = window.location.origin + window.location.pathname;
 
+      // Ask the backend what signup policy to apply.
+      // - <= threshold: server creates confirmed user (no email confirmation).
+      // - > threshold: fall back to standard Supabase signup (email confirmation required).
+      let policy;
+      try {
+        const r = await fetch('/api/public/signup', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        policy = await r.json();
+        if (!r.ok) throw new Error(JSON.stringify(policy));
+      } catch (e) {
+        // If server-side admin isn't configured, fall back to normal signup.
+        policy = { mode: 'fallback' };
+      }
+
+      if (policy.mode === 'created_confirmed') {
+        logAuth({ signedUp: true, mode: 'created_confirmed', userId: policy.user_id, user_count: policy.user_count });
+        // Now sign in normally.
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        await refreshTokenAndUI();
+        return;
+      }
+
+      // require_email_confirm (or fallback): standard Supabase signup
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -85,8 +111,6 @@ async function initSupabaseAuth() {
       });
       if (error) throw error;
 
-      // If email confirmations are ON, you may not get a session immediately.
-      // We show a helpful message either way.
       const userId = data?.user?.id;
       const hasSession = Boolean(data?.session?.access_token);
       if (hasSession) {
@@ -96,8 +120,8 @@ async function initSupabaseAuth() {
         logAuth({
           signedUp: true,
           userId,
+          mode: policy.mode || 'require_email_confirm',
           next: 'Check your email to confirm, then come back and Sign in.',
-          note: 'If you disabled email confirmations in Supabase, you can sign in immediately.'
         });
       }
     } catch (e) {

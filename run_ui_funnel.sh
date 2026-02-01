@@ -24,6 +24,13 @@ export SUPABASE_PROJECT_URL=${SUPABASE_PROJECT_URL:-$PUBLIC_SUPABASE_URL}
 export PUBLIC_SUPABASE_URL
 export PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY
 
+# Optional: service role key for server-side signup policy.
+if [[ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
+  export SUPABASE_SERVICE_ROLE_KEY
+elif [[ -n "${SECRET_KEYS:-}" ]]; then
+  export SUPABASE_SERVICE_ROLE_KEY="$SECRET_KEYS"
+fi
+
 # Start backend
 export PYTHONPATH="$ROOT_DIR/out/pylib:$ROOT_DIR/pylib"
 source "$ROOT_DIR/out/pyenv/bin/activate"
