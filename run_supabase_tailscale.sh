@@ -29,7 +29,11 @@ if [[ -z "${PUBLIC_SUPABASE_URL:-}" || -z "${PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT
   exit 1
 fi
 
-export ANKI_SERVICE_URL PUBLIC_SUPABASE_URL PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY
+# Better Auth demo code is still imported by server.mjs; it requires BETTER_AUTH_SECRET.
+# Provide a safe default here so the Supabase demo can run without extra env.
+export BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-"supabase-demo-secret-that-is-long-enough-1234567890"}
+
+export ANKI_SERVICE_URL PUBLIC_SUPABASE_URL PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY BETTER_AUTH_SECRET
 
 cleanup() {
   set +e
