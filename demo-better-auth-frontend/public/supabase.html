@@ -66,11 +66,20 @@
         return cfg;
       }
 
-      const cfg = await loadConfig();
+      let cfg;
+      try {
+        cfg = await loadConfig();
+      } catch (e) {
+        log(String(e?.message || e));
+        throw e;
+      }
 
       // Load supabase-js via ESM CDN.
       const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
       const supabase = createClient(cfg.supabaseUrl, cfg.supabasePublishableKey);
+
+      // Use same-origin proxy to avoid mixed-content blocks when this page is served over HTTPS.
+      const ankiBase = window.location.origin + '/anki';
 
       async function getAccessToken() {
         const { data, error } = await supabase.auth.getSession();
@@ -115,7 +124,7 @@
       document.getElementById('whoami').onclick = async () => {
         try {
           const token = await getAccessToken();
-          const r = await fetch(cfg.ankiServiceUrl + '/api/auth/whoami', {
+          const r = await fetch(ankiBase + '/api/auth/whoami', {
             headers: { Authorization: 'Bearer ' + token },
           });
           const data = await r.json().catch(async () => await r.text());
@@ -129,7 +138,7 @@
       document.getElementById('listNotes').onclick = async () => {
         try {
           const token = await getAccessToken();
-          const r = await fetch(cfg.ankiServiceUrl + '/api/note/list', {
+          const r = await fetch(ankiBase + '/api/note/list', {
             headers: { Authorization: 'Bearer ' + token },
           });
           const data = await r.json().catch(async () => await r.text());

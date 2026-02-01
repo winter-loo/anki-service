@@ -20,6 +20,39 @@ app.get("/demo-config.json", (req, res) => {
   });
 });
 
+// Reverse-proxy to anki-service so the public HTTPS page can call the API without mixed-content
+// issues, while still only exposing port 3000.
+app.all("/anki/*", async (req, res) => {
+  const ankiBase = process.env.ANKI_SERVICE_URL || "http://localhost:8000";
+  const path = req.originalUrl.replace(/^\/anki/, "");
+  const url = new URL(path, ankiBase);
+
+  // Forward headers (especially Authorization)
+  const headers = new Headers();
+  for (const [k, v] of Object.entries(req.headers)) {
+    if (k.toLowerCase() === "host") continue;
+    if (typeof v === "string") headers.set(k, v);
+    else if (Array.isArray(v)) headers.set(k, v.join(","));
+  }
+
+  const body = req.method === "GET" || req.method === "HEAD" ? undefined : JSON.stringify(req.body ?? {});
+
+  const r = await fetch(url.toString(), {
+    method: req.method,
+    headers,
+    body,
+  });
+
+  res.status(r.status);
+  r.headers.forEach((value, key) => {
+    // Don't forward hop-by-hop headers
+    if (key.toLowerCase() === "transfer-encoding") return;
+    res.setHeader(key, value);
+  });
+  const buf = Buffer.from(await r.arrayBuffer());
+  res.send(buf);
+});
+
 app.use(express.static("public"));
 
 // Mount Better Auth routes.
