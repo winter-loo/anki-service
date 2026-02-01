@@ -38,6 +38,7 @@
     </div>
     <div class="row">
       <button id="signin">Sign in</button>
+      <button id="signinGoogle">Sign in with Google</button>
       <button id="signout">Sign out</button>
       <button id="session">Get session</button>
     </div>
@@ -96,6 +97,23 @@
           const { data, error } = await supabase.auth.signInWithPassword({ email, password });
           if (error) throw error;
           log({ signedIn: true, user: data.user, sessionPreview: data.session?.access_token?.slice(0, 24) + '...' });
+        } catch (e) {
+          log(String(e?.message || e));
+        }
+      };
+
+      document.getElementById('signinGoogle').onclick = async () => {
+        try {
+          // Redirect-based OAuth flow.
+          // Supabase must allow this URL in Auth -> URL Configuration -> Redirect URLs.
+          const redirectTo = window.location.origin + window.location.pathname;
+          const { data, error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: { redirectTo },
+          });
+          if (error) throw error;
+          // Usually redirects immediately; this is just for debugging.
+          log({ oauth: 'started', redirectTo, data });
         } catch (e) {
           log(String(e?.message || e));
         }
