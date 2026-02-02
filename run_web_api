@@ -36,10 +36,10 @@ if [[ -n "${PUBLIC_SUPABASE_URL:-}" && -n "${PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT
 
   # Optional: service role key (server-side only) for admin ops like user counting/auto-confirm.
   # supabase.txt stores it as SECRET_KEYS.
-  if [[ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
-    export SUPABASE_SERVICE_ROLE_KEY
+  if [[ -n "${SUPABASE_SECRET_KEY:-}" ]]; then
+    export SUPABASE_SECRET_KEY
   elif [[ -n "${SECRET_KEYS:-}" ]]; then
-    export SUPABASE_SERVICE_ROLE_KEY="$SECRET_KEYS"
+    export SUPABASE_SECRET_KEY="$SECRET_KEYS"
   fi
 else
   echo "[run_web_api] Supabase env not found; starting in dev_header mode." >&2

@@ -16,6 +16,8 @@ export SUPABASE_PROJECT_URL='https://<ref>.supabase.co'
 
 # Storage (attach a persistent volume here in production)
 export ANKI_DATA_DIR='/mnt/anki-data'
+# Optional admin setup:
+export SUPABASE_SECRET_KEY='sb_secret_...'
 ```
 
 ## Request headers

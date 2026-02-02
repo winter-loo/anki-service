@@ -79,7 +79,7 @@ SUPABASE_AUDIENCE = os.environ.get("SUPABASE_JWT_AUDIENCE") or "authenticated"
 SUPABASE_JWKS_URL = os.environ.get("SUPABASE_JWKS_URL")
 
 # Server-side admin key (keep secret). Used only for optional signup policy/metrics.
-SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY")
 
 JWT_ISSUER = os.environ.get("ANKI_JWT_ISSUER")
 JWT_AUDIENCE = os.environ.get("ANKI_JWT_AUDIENCE")
@@ -439,8 +439,8 @@ def _supabase_admin_request(path: str, *, method: str = "GET", json_body: dict |
 
     Returns (status_code, headers_lower, json_data).
     """
-    if not SUPABASE_PROJECT_URL or not SUPABASE_SERVICE_ROLE_KEY:
-        raise HTTPException(500, "Supabase admin is not configured (set SUPABASE_PROJECT_URL and SUPABASE_SERVICE_ROLE_KEY)")
+    if not SUPABASE_PROJECT_URL or not SUPABASE_SECRET_KEY:
+        raise HTTPException(500, "Supabase admin is not configured (set SUPABASE_PROJECT_URL and SUPABASE_SECRET_KEY)")
 
     import urllib.request
     import urllib.error
@@ -451,8 +451,8 @@ def _supabase_admin_request(path: str, *, method: str = "GET", json_body: dict |
         body = json.dumps(json_body).encode("utf-8")
 
     req = urllib.request.Request(url, data=body, method=method)
-    req.add_header("apikey", SUPABASE_SERVICE_ROLE_KEY)
-    req.add_header("Authorization", f"Bearer {SUPABASE_SERVICE_ROLE_KEY}")
+    req.add_header("apikey", SUPABASE_SECRET_KEY)
+    req.add_header("Authorization", f"Bearer {SUPABASE_SECRET_KEY}")
     req.add_header("content-type", "application/json")
 
     try:

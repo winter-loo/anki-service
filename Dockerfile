@@ -53,7 +53,7 @@ RUN ./out/pyenv/bin/pip install --upgrade google-genai
 
 # Build the frontend
 RUN wget -qO- https://get.pnpm.io/install.sh | SHELL="$(which sh)" sh -
-RUN cd ui/web && pnpm install --frozen-lockfile && pnpm run build:release
+RUN cd ui/web && pnpm install && pnpm run build:release
 
 # Runtime stage
 FROM python:3.11-slim-bookworm
