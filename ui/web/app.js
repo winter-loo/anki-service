@@ -21,11 +21,22 @@ function showAuthUI() {
   document.getElementById('app')?.classList.add('hidden');
   document.getElementById('auth')?.classList.remove('hidden');
 
+  // Hide reset panel by default.
+  document.getElementById('reset')?.classList.add('hidden');
+
   // Clear UI state so it doesn't look usable after sign-out.
   const badge = document.getElementById('userBadge');
   if (badge) badge.textContent = '';
   // Do NOT write "Signed out" here: this runs on initial load when not logged in.
 }
+
+function showResetUI() {
+  // Show auth container (same page) but swap to reset panel.
+  document.getElementById('app')?.classList.add('hidden');
+  document.getElementById('auth')?.classList.remove('hidden');
+  document.getElementById('reset')?.classList.remove('hidden');
+}
+
 function showAppUI() {
   document.getElementById('auth')?.classList.add('hidden');
   document.getElementById('app')?.classList.remove('hidden');
@@ -66,6 +77,20 @@ async function initSupabaseAuth() {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       await refreshTokenAndUI();
+    } catch (e) {
+      logAuth(String(e?.message || e));
+    }
+  });
+
+  // Forgot password: send reset email.
+  document.getElementById('forgot')?.addEventListener('click', async () => {
+    try {
+      const email = document.getElementById('email').value;
+      if (!email) throw new Error('Please enter your email first.');
+      const redirectTo = window.location.origin + window.location.pathname;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+      if (error) throw error;
+      logAuth('If this email exists, a reset link has been sent. Check inbox/spam.');
     } catch (e) {
       logAuth(String(e?.message || e));
     }
@@ -178,9 +203,102 @@ async function initSupabaseAuth() {
     }
   });
 
+  // Reset-password flow: depending on Supabase settings, user may return with:
+  // - Implicit flow hash:  #access_token=...&type=recovery
+  // - PKCE flow query:    ?code=... (then exchangeCodeForSession)
+  // We should show the reset panel instead of the app.
+  const urlObj = new URL(window.location.href);
+  const hasRecoveryHash = window.location.hash.includes('type=recovery');
+  const hasCode = urlObj.searchParams.has('code');
+  const isRecovery = hasRecoveryHash || hasCode;
+
+  const resetOut = document.getElementById('resetOut');
+  const logReset = (x) => {
+    if (!resetOut) return;
+    resetOut.textContent = typeof x === 'string' ? x : JSON.stringify(x, null, 2);
+  };
+
+  document.getElementById('setPassword')?.addEventListener('click', async () => {
+    try {
+      const pw = document.getElementById('newPassword')?.value || '';
+      if (pw.length < 8) throw new Error('Password must be at least 8 characters.');
+      const { error } = await supabase.auth.updateUser({ password: pw });
+      if (error) throw error;
+      logReset('Password updated. You can sign in now.');
+      // Best-effort: clear hash to avoid stuck recovery mode.
+      history.replaceState(null, '', window.location.pathname);
+      await supabase.auth.signOut({ scope: 'local' });
+      showAuthUI();
+    } catch (e) {
+      logReset(String(e?.message || e));
+    }
+  });
+
+  document.getElementById('backToLogin')?.addEventListener('click', async () => {
+    history.replaceState(null, '', window.location.pathname);
+    showAuthUI();
+  });
+
   supabase.auth.onAuthStateChange(async () => {
+    // If we're in recovery flow, keep user on reset panel.
+    const u = new URL(window.location.href);
+    if (window.location.hash.includes('type=recovery') || u.searchParams.has('code')) {
+      showResetUI();
+      return;
+    }
     await refreshTokenAndUI();
   });
+
+  if (isRecovery) {
+    showResetUI();
+
+    // Avoid concurrent auth operations causing AbortError in gotrue locks.
+    async function safeGetSession(retries = 3) {
+      for (let i = 0; i < retries; i++) {
+        try {
+          return await supabase.auth.getSession();
+        } catch (e) {
+          const msg = String(e?.message || e);
+          if (msg.includes('AbortError') && i < retries - 1) {
+            await new Promise((r) => setTimeout(r, 150));
+            continue;
+          }
+          throw e;
+        }
+      }
+    }
+
+    try {
+      // Let supabase-js auto-detect & exchange session from URL when possible.
+      // If it doesn't, fall back to manual exchange (PKCE).
+      let sess = await safeGetSession();
+
+      const u = new URL(window.location.href);
+      const hasCodeNow = u.searchParams.has('code');
+      const hasSession = Boolean(sess?.data?.session);
+
+      if (!hasSession && hasCodeNow) {
+        const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
+        if (error) throw error;
+        // Clean URL (remove ?code=...)
+        history.replaceState(null, '', window.location.pathname + '#type=recovery');
+        sess = await safeGetSession();
+      }
+
+      if (!sess?.data?.session) {
+        logReset('No recovery session found. Please open this page from the reset email link again.');
+      } else {
+        logReset('Session ready. Set a new password.');
+      }
+
+      __authReady = true;
+      return true;
+    } catch (e) {
+      logReset('Session init failed: ' + String(e?.message || e));
+      __authReady = true;
+      return true;
+    }
+  }
 
   const ok = await refreshTokenAndUI();
   __authReady = true;
