@@ -19,6 +19,11 @@ if [[ -f "$HOME/credentials/supabase.txt" ]]; then
   set +a
 fi
 
+# Warn if UI hasn't been built yet.
+if [[ ! -f "$ROOT_DIR/ui/out/index.html" ]]; then
+  echo "[run_web_api] UI not built. Build it with: (cd ui/web && npm ci && npm run build)" >&2
+fi
+
 # If Supabase public config is available, run in Supabase auth mode.
 if [[ -n "${PUBLIC_SUPABASE_URL:-}" && -n "${PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY:-}" ]]; then
   export ANKI_AUTH_MODE=${ANKI_AUTH_MODE:-supabase}

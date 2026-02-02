@@ -80,6 +80,20 @@ Start the Web API using the provided helper script:
 
 The service will be available at `http://localhost:8000`. The helper script enables `--reload` mode, which is useful for development.
 
+### Web UI
+
+- UI source lives in `ui/web/` (SvelteKit + adapter-static)
+- Build output goes to `ui/out/` (not committed)
+- The FastAPI app serves static files from `ui/out/`
+
+Build the UI:
+
+```bash
+cd ui/web
+npm ci
+npm run build
+```
+
 ---
 
 ## Running with Podman/Docker

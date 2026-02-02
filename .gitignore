@@ -9,7 +9,13 @@ target
 /.bazel
 /windows.bazelrc
 /out
+/ui/out
 node_modules
+.env
+/tenants
+/ui/web_old
+/ui/web_old_bak*
+/demo-better-auth-frontend
 /instance
 /rust_service.log
 /api_chain.txt

@@ -850,4 +850,10 @@ def ui_config() -> dict:
 
 
 app.mount("/api", api_app)
-app.mount("/", StaticFiles(directory="ui/web", html=True), name="ui")
+
+# Static web UI
+# - Source: ui/web (SvelteKit)
+# - Build output: ui/out (not committed)
+UI_DIR = os.environ.get("ANKI_UI_DIR", "ui/out")
+os.makedirs(UI_DIR, exist_ok=True)
+app.mount("/", StaticFiles(directory=UI_DIR, html=True), name="ui")
