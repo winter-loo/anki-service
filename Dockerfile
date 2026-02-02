@@ -47,7 +47,7 @@ RUN ./build_anki
 RUN ./out/pyenv/bin/pip install --upgrade google-genai
 
 # Build the frontend
-RUN cd ui/web && npm ci && npm run build
+RUN npm install -g pnpm && cd ui/web && pnpm install --frozen-lockfile && pnpm run build:release
 
 # Runtime stage
 FROM python:3.11-slim-bookworm
