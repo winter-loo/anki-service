@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     git \
     protobuf-compiler \
     libprotobuf-dev \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust
