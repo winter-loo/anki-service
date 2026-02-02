@@ -11,6 +11,8 @@ RUN apt-get update && apt-get install -y \
     git \
     protobuf-compiler \
     libprotobuf-dev \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust
@@ -43,6 +45,9 @@ RUN ./build_anki
 
 # Install extra dependencies into the build venv
 RUN ./out/pyenv/bin/pip install --upgrade google-genai
+
+# Build the frontend
+RUN cd ui/web && npm ci && npm run build
 
 # Runtime stage
 FROM python:3.11-slim-bookworm
