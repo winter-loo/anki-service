@@ -11,7 +11,8 @@ RUN apt-get update && apt-get install -y \
     git \
     protobuf-compiler \
     libprotobuf-dev \
-    wget \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust
@@ -46,8 +47,7 @@ RUN ./build_anki
 RUN ./out/pyenv/bin/pip install --upgrade google-genai
 
 # Build the frontend
-RUN wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL="$(which sh)" sh -
-RUN cd ui/web && pnpm install && pnpm build:release
+RUN npm install -g pnpm && cd ui/web && pnpm install --frozen-lockfile && pnpm run build:release
 
 # Runtime stage
 FROM python:3.11-slim-bookworm
