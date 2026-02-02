@@ -13,11 +13,16 @@ RUN apt-get update && apt-get install -y \
     libprotobuf-dev \
     nodejs \
     npm \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Configure pnpm path for official standalone installation
+ENV PNPM_HOME="/root/.local/share/pnpm"
+ENV PATH="${PNPM_HOME}:${PATH}"
 
 # Set working directory
 WORKDIR /app
@@ -47,7 +52,8 @@ RUN ./build_anki
 RUN ./out/pyenv/bin/pip install --upgrade google-genai
 
 # Build the frontend
-RUN npm install -g pnpm && cd ui/web && pnpm install --frozen-lockfile && pnpm run build:release
+RUN wget -qO- https://get.pnpm.io/install.sh | SHELL="$(which sh)" sh -
+RUN cd ui/web && pnpm install --frozen-lockfile && pnpm run build:release
 
 # Runtime stage
 FROM python:3.11-slim-bookworm
