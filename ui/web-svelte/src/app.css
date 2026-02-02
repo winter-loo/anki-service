@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #FF6B00;
+  --color-primary-dark: #e65a00;
+  --color-background-light: #FFFFFF;
+  --color-background-dark: #0F1419;
+  --color-card-light: #F7F9F9;
+  --color-card-dark: #16181C;
+
+  --font-display: Inter, sans-serif;
+  
+  --radius-DEFAULT: 12px;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-display);
+    @apply bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 transition-colors duration-200;
+  }
+}
