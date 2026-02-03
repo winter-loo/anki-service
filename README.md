@@ -64,10 +64,10 @@ If you prefer to run the service directly on your host machine, follow these ste
    ./build_anki
    ```
 
-3. **Install additional dependencies**:
+3. **Activate the local venv (optional)**:
+   The build step creates `out/pyenv` and syncs `python/requirements.txt`.
    ```bash
    source out/pyenv/bin/activate
-   pip install --upgrade google-genai
    ```
 
 ### Running the Service
@@ -85,35 +85,28 @@ The service will be available at `http://localhost:8000`. The helper script enab
 - UI source lives in `ui/web/` (SvelteKit + adapter-static)
 - Build output goes to `ui/out/` (not committed)
 - The FastAPI app serves static files from `ui/out/`
+- If hosting the UI separately, set `PUBLIC_API_BASE_URL` at build time.
+  - Leave it empty for same-origin (local dev).
 
 Build the UI:
 
 ```bash
 cd ui/web
 npm ci
-npm run build
+npm run build:release
 ```
 
 ---
 
 ## Running with Podman/Docker
 
-You can build the image using the following command. By default, it clones the `main` branch of the repository.
+You can build the backend image using the following command from the repo root:
 
 ```bash
 podman build -t anki-service .
 ```
 
-### Customizing the Build
-
-You can specify a different repository or branch using build arguments:
-
-```bash
-podman build \
-  --build-arg REPO_URL=https://github.com/winter-loo/anki-service.git \
-  --build-arg BRANCH=main \
-  -t anki-service .
-```
+Note: the backend image does **not** include UI build output. The UI is deployed separately (see below).
 
 ## Running the Service
 
@@ -138,6 +131,28 @@ podman stop anki-service-app
 podman rm anki-service-app
 ```
 
-## deploy in cloud
+## Deployment (split UI + backend)
 
-[northflank](https://northflank.com)
+This repo is set up to **deploy UI and backend separately** to avoid rebuilding Rust/Python
+when only the UI changes.
+
+### UI (Cloudflare Pages)
+
+- Build output: `ui/out`
+- CI workflow: `.github/workflows/deploy-ui.yml`
+- Required secrets:
+  - `CLOUDFLARE_PAGES_API_TOKEN`
+  - `CLOUDFLARE_ACCOUNT_ID`
+  - `CLOUDFLARE_PAGES_PROJECT`
+  - `PUBLIC_SUPABASE_URL`
+  - `PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- Build-time API base:
+  - `PUBLIC_API_BASE_URL=https://mem.ldd.cool`
+
+### Backend (GHCR + Northflank)
+
+- CI workflow builds and pushes to GHCR: `.github/workflows/build-backend.yml`
+- Image tags:
+  - `ghcr.io/<owner>/<repo>:latest`
+  - `ghcr.io/<owner>/<repo>:<git-sha>`
+- Configure Northflank to deploy from GHCR instead of building from the Git repo.
