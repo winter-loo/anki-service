@@ -1,5 +1,6 @@
 <script>
     import { createEventDispatcher } from 'svelte';
+    import { PUBLIC_API_BASE_URL } from '$env/static/public';
     import {
       BookOpen,
       Home as HomeIcon,
@@ -39,12 +40,19 @@
         return data?.session?.access_token || null;
     }
 
+    const API_BASE = (PUBLIC_API_BASE_URL || '').replace(/\/+$/, '');
+    function apiUrl(path) {
+        if (!API_BASE) return path;
+        if (path.startsWith('/')) return `${API_BASE}${path}`;
+        return `${API_BASE}/${path}`;
+    }
+
     async function apiFetch(path, options = {}) {
         const token = await getAccessToken();
         if (!token) throw new Error('Not signed in');
         const headers = new Headers(options.headers || {});
         headers.set('Authorization', 'Bearer ' + token);
-        const res = await fetch(path, { ...options, headers });
+        const res = await fetch(apiUrl(path), { ...options, headers });
         if (!res.ok) {
             const t = await res.text().catch(() => '');
             throw new Error(`HTTP ${res.status}: ${t}`);
@@ -108,7 +116,7 @@
         explainError = '';
         explainResult = null;
         try {
-            const res = await fetch(`/explain/${encodeURIComponent(text)}`);
+            const res = await fetch(apiUrl(`/explain/${encodeURIComponent(text)}`));
             if (!res.ok) {
                 const t = await res.text().catch(() => '');
                 throw new Error(`HTTP ${res.status}: ${t}`);

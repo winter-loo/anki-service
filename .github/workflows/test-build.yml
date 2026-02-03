@@ -3,6 +3,9 @@ name: Test Build
 on:
   push:
     branches: [ "**" ]
+    paths-ignore:
+      - "ui/**"
+      - ".github/workflows/deploy-ui.yml"
   pull_request:
     branches: [ main ]
 

@@ -23,21 +23,6 @@ ENV CARGO_HOME=/usr/local/cargo
 ENV PATH="/usr/local/cargo/bin:${PATH}"
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
-# Install Node.js 24 via nvm + pnpm
-ENV NVM_DIR=/usr/local/nvm
-RUN mkdir -p "$NVM_DIR" \
-    && curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash \
-    && . "$NVM_DIR/nvm.sh" \
-    && nvm install 24 \
-    && nvm alias default 24 \
-    && nvm use default \
-    && npm install -g pnpm@latest \
-    && NODE_VERSION="$(nvm version default)" \
-    && ln -s "$NVM_DIR/versions/node/$NODE_VERSION/bin/node" /usr/local/bin/node \
-    && ln -s "$NVM_DIR/versions/node/$NODE_VERSION/bin/npm" /usr/local/bin/npm \
-    && ln -s "$NVM_DIR/versions/node/$NODE_VERSION/bin/npx" /usr/local/bin/npx \
-    && ln -s "$NVM_DIR/versions/node/$NODE_VERSION/bin/pnpm" /usr/local/bin/pnpm
-
 # Set working directory
 WORKDIR /app
 
@@ -53,9 +38,6 @@ RUN chmod +x build_anki run_build_system run_web_api
 # Run the build
 # This will build 'runner', set up pyenv, compile rust parts, and python protos.
 RUN ./build_anki
-
-# Build the frontend
-RUN cd ui/web && pnpm install && pnpm run build:release
 
 # Runtime stage
 FROM python:3.11-slim-bookworm
