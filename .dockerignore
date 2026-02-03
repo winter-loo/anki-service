@@ -1,9 +1,38 @@
-out
-target
-__pycache__
+# Keep build context lean, but include .git for Rust build metadata
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Rust
+/target/
+
+# Node
+**/node_modules/
+**/.pnpm-store/
+
+# Build outputs
+/out/
+/ui/out/
+/dist/
+**/.parcel-cache/
+
+# Tests/artifacts
+/tests/output/
+
+# Logs
+*.log
+
+# OS/editor
 .DS_Store
-.idea
-.vscode
-node_modules
-instance
-rust_service.log
+Thumbs.db
+.idea/
+.vscode/
+
+# Git: keep .git for build metadata
+!.git/

@@ -1,8 +1,12 @@
 FROM python:3.11-slim-bookworm AS builder
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ARG DEBIAN_FRONTEND=noninteractive
+
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    ca-certificates \
     build-essential \
     libssl-dev \
     pkg-config \
@@ -11,35 +15,37 @@ RUN apt-get update && apt-get install -y \
     git \
     protobuf-compiler \
     libprotobuf-dev \
-    nodejs \
-    npm \
-    wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust
+ENV RUSTUP_HOME=/usr/local/rustup
+ENV CARGO_HOME=/usr/local/cargo
+ENV PATH="/usr/local/cargo/bin:${PATH}"
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
 
-# Configure pnpm path for official standalone installation
-ENV PNPM_HOME="/root/.local/share/pnpm"
-ENV PATH="${PNPM_HOME}:${PATH}"
+# Install Node.js 24 via nvm + pnpm
+ENV NVM_DIR=/usr/local/nvm
+RUN mkdir -p "$NVM_DIR" \
+    && curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash \
+    && . "$NVM_DIR/nvm.sh" \
+    && nvm install 24 \
+    && nvm alias default 24 \
+    && nvm use default \
+    && npm install -g pnpm@latest \
+    && NODE_VERSION="$(nvm version default)" \
+    && ln -s "$NVM_DIR/versions/node/$NODE_VERSION/bin/node" /usr/local/bin/node \
+    && ln -s "$NVM_DIR/versions/node/$NODE_VERSION/bin/npm" /usr/local/bin/npm \
+    && ln -s "$NVM_DIR/versions/node/$NODE_VERSION/bin/npx" /usr/local/bin/npx \
+    && ln -s "$NVM_DIR/versions/node/$NODE_VERSION/bin/pnpm" /usr/local/bin/pnpm
 
 # Set working directory
 WORKDIR /app
 
-# Build arguments for repository and branch
-ARG REPO_URL=https://github.com/winter-loo/anki-service.git
-ARG BRANCH=main
-
-# Clone the repository
-RUN git clone --depth 1 --branch ${BRANCH} ${REPO_URL} anki-service
+# Copy the repository from the build context
+COPY . /app/anki-service
 
 # Switch to the repository directory
 WORKDIR /app/anki-service
-
-# Configure git to allow running commands in the repository
-# This prevents "fatal: detected dubious ownership in repository" errors
-RUN git config --global --add safe.directory /app/anki-service
 
 # Ensure the 'build_anki' script is executable
 RUN chmod +x build_anki run_build_system run_web_api
@@ -48,20 +54,19 @@ RUN chmod +x build_anki run_build_system run_web_api
 # This will build 'runner', set up pyenv, compile rust parts, and python protos.
 RUN ./build_anki
 
-# Install extra dependencies into the build venv
-RUN ./out/pyenv/bin/pip install --upgrade google-genai
-
 # Build the frontend
-RUN wget -qO- https://get.pnpm.io/install.sh | SHELL="$(which sh)" sh -
 RUN cd ui/web && pnpm install && pnpm run build:release
 
 # Runtime stage
 FROM python:3.11-slim-bookworm
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ARG DEBIAN_FRONTEND=noninteractive
+
 WORKDIR /app
 
 # Install runtime dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -75,6 +80,7 @@ WORKDIR /app/anki-service
 ENV VIRTUAL_ENV=/app/anki-service/out/pyenv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 ENV PYTHONPATH="/app/anki-service/out/pylib:/app/anki-service/pylib"
+ENV PYTHONUNBUFFERED=1
 
 # Expose port
 EXPOSE 8000
