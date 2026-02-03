@@ -80,22 +80,6 @@ Start the Web API using the provided helper script:
 
 The service will be available at `http://localhost:8000`. The helper script enables `--reload` mode, which is useful for development.
 
-### Web UI
-
-- UI source lives in `ui/web/` (SvelteKit + adapter-static)
-- Build output goes to `ui/out/` (not committed)
-- The FastAPI app serves static files from `ui/out/`
-- If hosting the UI separately, set `PUBLIC_API_BASE_URL` at build time.
-  - Leave it empty for same-origin (local dev).
-
-Build the UI:
-
-```bash
-cd ui/web
-npm ci
-npm run build:release
-```
-
 ---
 
 ## Running with Podman/Docker
@@ -105,8 +89,6 @@ You can build the backend image using the following command from the repo root:
 ```bash
 podman build -t anki-service .
 ```
-
-Note: the backend image does **not** include UI build output. The UI is deployed separately (see below).
 
 ## Running the Service
 
@@ -131,23 +113,7 @@ podman stop anki-service-app
 podman rm anki-service-app
 ```
 
-## Deployment (split UI + backend)
-
-This repo is set up to **deploy UI and backend separately** to avoid rebuilding Rust/Python
-when only the UI changes.
-
-### UI (Cloudflare Pages)
-
-- Build output: `ui/out`
-- CI workflow: `.github/workflows/deploy-ui.yml`
-- Required secrets:
-  - `CLOUDFLARE_PAGES_API_TOKEN`
-  - `CLOUDFLARE_ACCOUNT_ID`
-  - `CLOUDFLARE_PAGES_PROJECT`
-  - `PUBLIC_SUPABASE_URL`
-  - `PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-- Build-time API base:
-  - `PUBLIC_API_BASE_URL=https://mem.ldd.cool`
+## Deployment (Backend)
 
 ### Backend (GHCR + Northflank)
 
