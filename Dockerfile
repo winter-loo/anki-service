@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     protobuf-compiler \
     libprotobuf-dev \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust
@@ -38,6 +39,19 @@ RUN chmod +x scripts/build_anki.sh scripts/run_build_system.sh scripts/run_web_a
 # Run the build
 # This will build 'runner', set up pyenv, compile rust parts, and python protos.
 RUN scripts/build_anki.sh
+
+# Download pre-built UI distribution from GitHub Releases
+ARG MEMIT_VERSION="latest"
+RUN mkdir -p ui/out && \
+    if [ "$MEMIT_VERSION" = "latest" ]; then \
+      UI_RELEASE_URL="https://github.com/winter-loo/memit/releases/latest/download/memit-web-dist.zip"; \
+    else \
+      UI_RELEASE_URL="https://github.com/winter-loo/memit/releases/download/${MEMIT_VERSION}/memit-web-dist.zip"; \
+    fi && \
+    curl -L "$UI_RELEASE_URL" -o ui_build.zip && \
+    unzip ui_build.zip -d ui/ && \
+    mv ui/dist/* ui/out/ && \
+    rm ui_build.zip && rm -rf ui/dist
 
 # Runtime stage
 FROM python:3.11-slim-bookworm
