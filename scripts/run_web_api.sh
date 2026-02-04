@@ -5,7 +5,8 @@ set -euo pipefail
 # Defaults to Supabase auth mode if credentials are available.
 
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-cd "$ROOT_DIR"
+# change work directory to main source directory
+cd "$ROOT_DIR"/..
 
 export PYTHONPATH="$ROOT_DIR/out/pylib:$ROOT_DIR/pylib"
 source "$ROOT_DIR/out/pyenv/bin/activate"

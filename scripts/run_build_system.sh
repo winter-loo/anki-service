@@ -2,6 +2,9 @@
 
 set -e
 
+ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+cd $ROOT_DIR/..
+
 if [ "$BUILD_ROOT" == "" ]; then
     out=$(pwd)/out
 else

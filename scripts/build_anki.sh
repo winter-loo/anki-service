@@ -2,6 +2,9 @@
 
 set -e
 
+ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+cd $ROOT_DIR/..
+
 if [ -z $(command -v python3) ]; then
   echo "install python first, version >= 3.10"
   exit 1
@@ -23,4 +26,4 @@ export LOG_SERVICE_CALLS=0
 export PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
 export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
-./run_build_system pylib/anki
+scripts/run_build_system.sh pylib/anki

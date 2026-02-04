@@ -33,11 +33,11 @@ COPY . /app/anki-service
 WORKDIR /app/anki-service
 
 # Ensure the 'build_anki' script is executable
-RUN chmod +x build_anki run_build_system run_web_api
+RUN chmod +x scripts/build_anki.sh scripts/run_build_system.sh scripts/run_web_api.sh
 
 # Run the build
 # This will build 'runner', set up pyenv, compile rust parts, and python protos.
-RUN ./build_anki
+RUN scripts/build_anki.sh
 
 # Runtime stage
 FROM python:3.11-slim-bookworm

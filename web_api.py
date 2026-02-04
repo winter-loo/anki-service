@@ -46,7 +46,7 @@ from dataclasses import dataclass
 
 AUTH_MODE = os.environ.get("ANKI_AUTH_MODE", "dev_header")
 # Storage base directory (attach a persistent volume here in production)
-DATA_DIR = os.environ.get("ANKI_DATA_DIR", os.environ.get("ANKI_TENANT_BASE_DIR", "tenants"))
+DATA_DIR = os.environ.get("ANKI_DATA_DIR", os.environ.get("ANKI_USER_BASE_DIR", "users_data"))
 DEFAULT_COLLECTION_ID = os.environ.get("ANKI_DEFAULT_COLLECTION_ID", "default")
 
 # JWT verification settings.
@@ -317,7 +317,7 @@ def require_user_id(
 
 
 @dataclass
-class TenantBackend:
+class UserBackend:
     backend: RustBackend
     lock: threading.Lock
 
@@ -327,13 +327,13 @@ class BackendManager:
 
     def __init__(self) -> None:
         _ensure_dir(DATA_DIR)
-        self._items: dict[tuple[str, str], TenantBackend] = {}
+        self._items: dict[tuple[str, str], UserBackend] = {}
         self._guard = threading.Lock()
 
     def evict(self, user_id: str, collection_id: str) -> None:
         """Remove a cached backend (best-effort close)."""
         key = (str(user_id), str(collection_id))
-        tb: TenantBackend | None = None
+        tb: UserBackend | None = None
         with self._guard:
             tb = self._items.pop(key, None)
         if tb is not None:
@@ -356,7 +356,7 @@ class BackendManager:
         _ensure_dir(log_dir)
         return col_dir, collection_path, media_folder_path, media_db_path
 
-    def get(self, user_id: str, collection_id: str) -> TenantBackend:
+    def get(self, user_id: str, collection_id: str) -> UserBackend:
         key = (str(user_id), str(collection_id))
         with self._guard:
             if key in self._items:
@@ -364,14 +364,14 @@ class BackendManager:
 
             if RustBackend is None:
                 raise RuntimeError(
-                    "Anki RustBackend is not available (missing compiled extension). Run ./build_anki first."
+                    "Anki RustBackend is not available (missing compiled extension)."
                 )
 
             col_dir, collection_path, media_folder_path, media_db_path = self._collection_paths(user_id, collection_id)
 
-            # Initialize backend per tenant.
+            # Initialize backend per user.
             # Logging initialization is global-ish, but we can still point it at the
-            # tenant's directory for easier debugging.
+            # user's directory for easier debugging.
             # Passing a custom log directory path can fail on some platforms/builds.
             # Default logging setup is sufficient for the web API.
             RustBackend.initialize_logging(None)
@@ -383,7 +383,7 @@ class BackendManager:
                 force_schema11=False,
             )
 
-            item = TenantBackend(backend=bk, lock=threading.Lock())
+            item = UserBackend(backend=bk, lock=threading.Lock())
             self._items[key] = item
             return item
 
@@ -405,7 +405,7 @@ def require_collection_id(x_collection_id: str | None = Header(default=None)) ->
 def get_bk(
     user_id: str = Depends(require_user_id),
     collection_id: str = Depends(require_collection_id),
-) -> TenantBackend:
+) -> UserBackend:
     return backend_manager.get(user_id, collection_id)
 
 
@@ -677,7 +677,7 @@ class CreateCollectionRequest(BaseModel):
 
 
 @api_app.get("/note/list")
-def list_notes(tb: TenantBackend = Depends(get_bk)):
+def list_notes(tb: UserBackend = Depends(get_bk)):
     with tb.lock:
         deck = tb.backend.get_current_deck()
         sn = anki.search_pb2.SearchNode(deck=deck.name)
@@ -694,7 +694,7 @@ def list_notes(tb: TenantBackend = Depends(get_bk)):
 
 
 @api_app.post("/note/add/{fld}")
-def create_note(fld: str, tb: TenantBackend = Depends(get_bk)):
+def create_note(fld: str, tb: UserBackend = Depends(get_bk)):
     with tb.lock:
         basic_notetype = tb.backend.get_notetype_names()[0]
         nn = tb.backend.new_note(basic_notetype.id)
@@ -704,7 +704,7 @@ def create_note(fld: str, tb: TenantBackend = Depends(get_bk)):
 
 
 @api_app.post("/note/add")
-def create_note_by_json(new_user_note: UserNote, tb: TenantBackend = Depends(get_bk)):
+def create_note_by_json(new_user_note: UserNote, tb: UserBackend = Depends(get_bk)):
     with tb.lock:
         basic_notetype = tb.backend.get_notetype_names()[0]
         nn = tb.backend.new_note(basic_notetype.id)
@@ -719,7 +719,7 @@ def create_note_by_json(new_user_note: UserNote, tb: TenantBackend = Depends(get
 
 
 @api_app.post("/note/update/@{note_id}")
-def update_note_by_id(note_id: int, user_note: UserNote, tb: TenantBackend = Depends(get_bk)):
+def update_note_by_id(note_id: int, user_note: UserNote, tb: UserBackend = Depends(get_bk)):
     with tb.lock:
         note = tb.backend.get_note(note_id)
         note.fields[0] = user_note.fields[0]
@@ -729,14 +729,14 @@ def update_note_by_id(note_id: int, user_note: UserNote, tb: TenantBackend = Dep
 
 
 @api_app.get("/note/@{note_id}")
-def read_note_by_id(note_id: int, tb: TenantBackend = Depends(get_bk)):
+def read_note_by_id(note_id: int, tb: UserBackend = Depends(get_bk)):
     with tb.lock:
         note = tb.backend.get_note(note_id)
         return MessageToDict(note)
 
 
 @api_app.post("/note/delete/@{note_id}")
-def delete_note_by_id(note_id: int, tb: TenantBackend = Depends(get_bk)):
+def delete_note_by_id(note_id: int, tb: UserBackend = Depends(get_bk)):
     with tb.lock:
         card_ids = tb.backend.cards_of_note(nid=note_id)
         resp = tb.backend.remove_notes(note_ids=[note_id], card_ids=card_ids)
@@ -744,21 +744,21 @@ def delete_note_by_id(note_id: int, tb: TenantBackend = Depends(get_bk)):
 
 
 @api_app.get("/note/studied_today")
-def list_notes_studied_today(tb: TenantBackend = Depends(get_bk)):
+def list_notes_studied_today(tb: UserBackend = Depends(get_bk)):
     with tb.lock:
         resp = tb.backend.studied_today()
         return {"msg": resp}
 
 
 @api_app.get("/card/sched_timing_today")
-def get_scheduled_timing_today(tb: TenantBackend = Depends(get_bk)):
+def get_scheduled_timing_today(tb: UserBackend = Depends(get_bk)):
     with tb.lock:
         resp = tb.backend.sched_timing_today()
         return MessageToDict(resp)
 
 
 @api_app.get("/card/next")
-def get_next_card(tb: TenantBackend = Depends(get_bk)):
+def get_next_card(tb: UserBackend = Depends(get_bk)):
     with tb.lock:
         qcards = tb.backend.get_queued_cards(fetch_limit=1, intraday_learning_only=False)
         return MessageToDict(qcards)
@@ -809,7 +809,7 @@ def rating_from_ease(ease):
 
 
 @api_app.post("/card/answer/{ease}")
-def answer_card(ease: int, tb: TenantBackend = Depends(get_bk)):
+def answer_card(ease: int, tb: UserBackend = Depends(get_bk)):
     with tb.lock:
         qcards = tb.backend.get_queued_cards(fetch_limit=1, intraday_learning_only=False)
         if len(qcards.cards) == 0:

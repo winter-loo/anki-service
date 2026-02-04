@@ -17,7 +17,7 @@ set -euo pipefail
 #   SUPABASE_TEST_PASSWORD=<password>
 # Optional:
 #   ANKI_SERVICE_URL=http://127.0.0.1:8000
-#   ANKI_DATA_DIR=tenants
+#   ANKI_DATA_DIR=users
 
 ANKI_SERVICE_URL=${ANKI_SERVICE_URL:-http://127.0.0.1:8000}
 SUPABASE_PROJECT_URL=${SUPABASE_PROJECT_URL:?missing SUPABASE_PROJECT_URL}
@@ -33,7 +33,7 @@ fi
 SUPABASE_TEST_EMAIL=${SUPABASE_TEST_EMAIL:?missing SUPABASE_TEST_EMAIL}
 SUPABASE_TEST_PASSWORD=${SUPABASE_TEST_PASSWORD:?missing SUPABASE_TEST_PASSWORD}
 
-ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
 cleanup() {
   set +e

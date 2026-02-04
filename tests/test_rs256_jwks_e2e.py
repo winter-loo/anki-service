@@ -54,7 +54,7 @@ def test_rs256_jwks_auth_whoami():
     issuer = f"http://127.0.0.1:{port}"
 
     jwk, token = _make_rsa_jwk_and_token(
-        sub="tenant-123",
+        sub="user-123",
         issuer=issuer,
         audience=None,
         jwks_url=f"{issuer}/.well-known/jwks.json",
@@ -87,7 +87,7 @@ def test_rs256_jwks_auth_whoami():
     r = client.get("/auth/whoami", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200, r.text
     data = r.json()
-    assert data["user_id"] == "tenant-123"
+    assert data["user_id"] == "user-123"
     assert data["jwt_alg"] == "RS256"
 
     server.shutdown()

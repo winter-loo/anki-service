@@ -2,20 +2,20 @@
 
 This project provides an Anki Web API, which can be run either locally or via a containerized environment (Podman/Docker).
 
-## Multi-tenant + Auth (recommended)
+## Multi-user + Auth
 
-By default, the API is **multi-tenant**: each authenticated user maps to a separate Anki collection on disk.
+By default, the API is **multi-user**: each authenticated user maps to a separate Anki collection on disk.
 
-- Tenant storage root: `tenants/` (configurable via `ANKI_TENANT_BASE_DIR`)
-- Per-tenant collection:
-  - `tenants/<tenant_id>/collection.anki2`
-  - `tenants/<tenant_id>/collection.media/`
+- User storage root: `users/` (configurable via `ANKI_USER_BASE_DIR`)
+- Per-user collection:
+  - `users/<user_id>/collection.anki2`
+  - `users/<user_id>/collection.media/`
 
 ### Auth modes
 
 Set `ANKI_AUTH_MODE`:
 
-- `dev_header` (default): send `X-User-Id: <tenant_id>` (useful for local dev)
+- `dev_header` (default): send `X-User-Id: <user_id>` (useful for local dev)
 - `jwt`: send `Authorization: Bearer <jwt>`; verifies JWTs.
   - Default: **RS256 + JWKS** (recommended for production)
   - Optional: HS256 (dev/legacy)
@@ -61,7 +61,7 @@ If you prefer to run the service directly on your host machine, follow these ste
 2. **Run the initialization script**:
    This script will compile the Rust components, set up a local virtual environment in `out/pyenv`, and generate the necessary Python protocols.
    ```bash
-   ./build_anki
+   scripts/build_anki.sh
    ```
 
 3. **Activate the local venv (optional)**:
@@ -75,7 +75,7 @@ If you prefer to run the service directly on your host machine, follow these ste
 Start the Web API using the provided helper script:
 
 ```bash
-./run_web_api
+scripts/run_web_api.sh
 ```
 
 The service will be available at `http://localhost:8000`. The helper script enables `--reload` mode, which is useful for development.
@@ -113,12 +113,7 @@ podman stop anki-service-app
 podman rm anki-service-app
 ```
 
-## Deployment (Backend)
+## Deployment in Cloud
 
-### Backend (GHCR + Northflank)
-
-- CI workflow builds and pushes to GHCR: `.github/workflows/build-backend.yml`
-- Image tags:
-  - `ghcr.io/<owner>/<repo>:latest`
-  - `ghcr.io/<owner>/<repo>:<git-sha>`
-- Configure Northflank to deploy from GHCR instead of building from the Git repo.
+- [Northflank](https://northflank.com/)
+- [Google Cloud Run](https://console.cloud.google.com/cloud-build)

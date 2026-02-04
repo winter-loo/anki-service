@@ -1,5 +1,0 @@
-#!/bin/bash
-
-export PYTHONPATH=$PWD/out/pylib:$PWD/pylib
-source out/pyenv/bin/activate
-python main.py
