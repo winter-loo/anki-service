@@ -65,7 +65,7 @@ wait_http_status() {
   PYTHONPATH="$ROOT_DIR/out/pylib:$ROOT_DIR/pylib" \
     ANKI_AUTH_MODE=supabase \
     # Supabase may use RS256 or ES256 depending on project; AUTO reads alg from token header.
-    ANKI_JWT_ALG=AUTO \
+    ANKI_JWT_ALG=RS256  \
     PUBLIC_SUPABASE_URL="$PUBLIC_SUPABASE_URL" \
     ${ANKI_DATA_DIR:+ANKI_DATA_DIR="$ANKI_DATA_DIR"} \
     "$ROOT_DIR/out/pyenv/bin/uvicorn" web_api:app --host 127.0.0.1 --port 8000

@@ -28,7 +28,7 @@ fi
 # If Supabase public config is available, run in Supabase auth mode.
 if [[ -n "${PUBLIC_SUPABASE_URL:-}" && -n "${PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY:-}" ]]; then
   export ANKI_AUTH_MODE=${ANKI_AUTH_MODE:-supabase}
-  export ANKI_JWT_ALG=${ANKI_JWT_ALG:-AUTO}
+  export ANKI_JWT_ALG=${ANKI_JWT_ALG:-RS256}
   export PUBLIC_SUPABASE_URL=${PUBLIC_SUPABASE_URL:-$PUBLIC_SUPABASE_URL}
 
   # Used by /ui-config.json for the static UI.
