@@ -76,7 +76,7 @@ def test_supabase_auth_mode_whoami(tmp_path):
 
     # Configure env before import
     os.environ["ANKI_AUTH_MODE"] = "supabase"
-    os.environ["SUPABASE_PROJECT_URL"] = f"http://127.0.0.1:{port}"  # issuer derived as /auth/v1
+    os.environ["PUBLIC_SUPABASE_URL"] = f"http://127.0.0.1:{port}"  # issuer derived as /auth/v1
     os.environ.pop("SUPABASE_JWT_ISSUER", None)
     os.environ.pop("SUPABASE_JWKS_URL", None)
     os.environ["ANKI_DATA_DIR"] = str(tmp_path)

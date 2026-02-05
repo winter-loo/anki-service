@@ -73,7 +73,7 @@ JWT_ALG = (os.environ.get("ANKI_JWT_ALG") or os.environ.get("ANKI_JWT_ALG_SUPABA
 # Useful when the issuer rotates algorithms (e.g., newer Supabase projects default to ES256).
 JWT_HS256_SECRET = os.environ.get("ANKI_JWT_HS256_SECRET")
 
-SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_PROJECT_URL")
+# Supabase Auth
 SUPABASE_ISSUER = os.environ.get("SUPABASE_JWT_ISSUER")
 SUPABASE_AUDIENCE = os.environ.get("SUPABASE_JWT_AUDIENCE") or "authenticated"
 SUPABASE_JWKS_URL = os.environ.get("SUPABASE_JWKS_URL")
@@ -285,11 +285,11 @@ def require_user_id(
 
         try:
             if AUTH_MODE == "supabase":
-                issuer = SUPABASE_ISSUER or _supabase_default_issuer(SUPABASE_PROJECT_URL)
+                issuer = SUPABASE_ISSUER or _supabase_default_issuer(os.environ.get("PUBLIC_SUPABASE_URL"))
                 if not issuer:
                     raise HTTPException(
                         500,
-                        "Supabase auth enabled but issuer is not configured. Set SUPABASE_PROJECT_URL or SUPABASE_JWT_ISSUER.",
+                        "Supabase auth enabled but issuer is not configured. Set PUBLIC_SUPABASE_URL or SUPABASE_JWT_ISSUER.",
                     )
                 claims = _verify_with(
                     issuer=issuer,
@@ -439,13 +439,14 @@ def _supabase_admin_request(path: str, *, method: str = "GET", json_body: dict |
 
     Returns (status_code, headers_lower, json_data).
     """
-    if not SUPABASE_PROJECT_URL or not SUPABASE_SECRET_KEY:
-        raise HTTPException(500, "Supabase admin is not configured (set SUPABASE_PROJECT_URL and SUPABASE_SECRET_KEY)")
+    project_url = os.environ.get("PUBLIC_SUPABASE_URL")
+    if not project_url or not SUPABASE_SECRET_KEY:
+        raise HTTPException(500, "Supabase admin is not configured (set PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY)")
 
     import urllib.request
     import urllib.error
 
-    url = SUPABASE_PROJECT_URL.rstrip("/") + path
+    url = project_url.rstrip("/") + path
     body = None
     if json_body is not None:
         body = json.dumps(json_body).encode("utf-8")
@@ -839,13 +840,8 @@ def ui_config() -> dict:
     Keep this endpoint free of secrets.
     """
     return {
-        "supabaseUrl": os.environ.get("PUBLIC_SUPABASE_URL")
-        or os.environ.get("SUPABASE_PROJECT_URL")
-        or "",
-        "supabasePublishableKey": os.environ.get("PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY")
-        or os.environ.get("SUPABASE_PUBLISHABLE_KEY")
-        or os.environ.get("SUPABASE_ANON_KEY")
-        or "",
+        "supabaseUrl": os.environ.get("PUBLIC_SUPABASE_URL") or "",
+        "supabasePublishableKey": os.environ.get("PUBLIC_SUPABASE_PUBLISHABLE_KEY") or "",
     }
 
 

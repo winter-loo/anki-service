@@ -10,7 +10,7 @@ set -euo pipefail
 # - a basic API route works (/api/note/list)
 #
 # Required env vars:
-#   SUPABASE_PROJECT_URL=https://<ref>.supabase.co
+#   PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
 #   SUPABASE_PUBLISHABLE_KEY=<Supabase publishable key>
 #     (Older name SUPABASE_ANON_KEY is also accepted for compatibility)
 #   SUPABASE_TEST_EMAIL=<email>
@@ -20,7 +20,7 @@ set -euo pipefail
 #   ANKI_DATA_DIR=users
 
 ANKI_SERVICE_URL=${ANKI_SERVICE_URL:-http://127.0.0.1:8000}
-SUPABASE_PROJECT_URL=${SUPABASE_PROJECT_URL:?missing SUPABASE_PROJECT_URL}
+PUBLIC_SUPABASE_URL=${PUBLIC_SUPABASE_URL:?missing PUBLIC_SUPABASE_URL}
 
 # Supabase renamed keys: anon/public -> publishable.
 # Accept both names to keep setup friction low.
@@ -66,7 +66,7 @@ wait_http_status() {
     ANKI_AUTH_MODE=supabase \
     # Supabase may use RS256 or ES256 depending on project; AUTO reads alg from token header.
     ANKI_JWT_ALG=AUTO \
-    SUPABASE_PROJECT_URL="$SUPABASE_PROJECT_URL" \
+    PUBLIC_SUPABASE_URL="$PUBLIC_SUPABASE_URL" \
     ${ANKI_DATA_DIR:+ANKI_DATA_DIR="$ANKI_DATA_DIR"} \
     "$ROOT_DIR/out/pyenv/bin/uvicorn" web_api:app --host 127.0.0.1 --port 8000
 ) >/tmp/anki-service-supabase-e2e.log 2>&1 &
@@ -81,7 +81,7 @@ TOKEN_JSON=$(curl -fsS \
   -H "Authorization: Bearer $SUPABASE_PUBLISHABLE_KEY" \
   -H "content-type: application/json" \
   -d "{\"email\":\"$SUPABASE_TEST_EMAIL\",\"password\":\"$SUPABASE_TEST_PASSWORD\"}" \
-  "$SUPABASE_PROJECT_URL/auth/v1/token?grant_type=password")
+  "$PUBLIC_SUPABASE_URL/auth/v1/token?grant_type=password")
 
 ACCESS_TOKEN=$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["access_token"])' <<<"$TOKEN_JSON")
 

@@ -8,7 +8,7 @@ Set:
 
 ```bash
 export ANKI_AUTH_MODE=supabase
-export SUPABASE_PROJECT_URL='https://<ref>.supabase.co'
+export PUBLIC_SUPABASE_URL='https://<ref>.supabase.co'
 # Optional overrides:
 # export SUPABASE_JWT_ISSUER='https://<ref>.supabase.co/auth/v1'
 # export SUPABASE_JWKS_URL='https://<ref>.supabase.co/auth/v1/.well-known/jwks.json'
