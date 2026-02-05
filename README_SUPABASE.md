@@ -9,6 +9,9 @@ Set:
 ```bash
 export ANKI_AUTH_MODE=supabase
 export PUBLIC_SUPABASE_URL='https://<ref>.supabase.co'
+# Optional: Supabase projects may use ES256; AUTO reads the token header.
+# export ANKI_JWT_ALG='AUTO'  # or ES256
+# ES256 requires cryptography (install PyJWT[crypto]).
 # Optional overrides:
 # export SUPABASE_JWT_ISSUER='https://<ref>.supabase.co/auth/v1'
 # export SUPABASE_JWKS_URL='https://<ref>.supabase.co/auth/v1/.well-known/jwks.json'

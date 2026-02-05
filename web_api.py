@@ -88,6 +88,10 @@ JWT_JWKS_URL = os.environ.get("ANKI_JWKS_URL")
 JWT_LEEWAY = int(os.environ.get("ANKI_JWT_LEEWAY", "60"))
 
 
+class AuthDependencyError(RuntimeError):
+    """Raised when optional auth dependencies are missing."""
+
+
 def _ensure_dir(path: str) -> None:
     os.makedirs(path, exist_ok=True)
 
@@ -130,6 +134,25 @@ def _jwt_unverified_claims(token: str) -> dict:
 
 def _b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).decode("utf-8").rstrip("=")
+
+
+def _require_crypto(alg: str) -> None:
+    if alg in ("RS256", "ES256"):
+        try:
+            import cryptography  # noqa: F401
+        except Exception as e:  # pragma: no cover
+            raise AuthDependencyError(
+                f"{alg} requires 'cryptography' to be installed. Install cryptography or PyJWT[crypto]."
+            ) from e
+
+
+def _import_pyjwt():
+    try:
+        import jwt
+        from jwt import PyJWKClient
+    except Exception as e:  # pragma: no cover
+        raise AuthDependencyError(f"Missing PyJWT dependency: {e}") from e
+    return jwt, PyJWKClient
 
 
 def verify_hs256_jwt(token: str, *, secret: str, issuer: str | None, audience: str | None) -> dict:
@@ -213,11 +236,8 @@ def verify_jwt_via_jwks(
     if alg not in ("RS256", "ES256"):
         raise ValueError(f"unsupported alg {alg!r} (expected RS256 or ES256)")
 
-    try:
-        import jwt
-        from jwt import PyJWKClient
-    except Exception as e:  # pragma: no cover
-        raise RuntimeError(f"Missing PyJWT dependency: {e}")
+    _require_crypto(alg)
+    jwt, PyJWKClient = _import_pyjwt()
 
     jwks_client = PyJWKClient(jwks_url)
     signing_key = jwks_client.get_signing_key_from_jwt(token).key
@@ -266,9 +286,10 @@ def require_user_id(
             alg = JWT_ALG
             if alg == "AUTO":
                 try:
-                    import jwt
-
+                    jwt, _ = _import_pyjwt()
                     alg = (jwt.get_unverified_header(token) or {}).get("alg", "").upper()
+                except AuthDependencyError:
+                    raise
                 except Exception:
                     alg = ""
                 if alg not in ("RS256", "ES256"):
@@ -305,6 +326,8 @@ def require_user_id(
                 )
         except HTTPException:
             raise
+        except AuthDependencyError as e:
+            raise HTTPException(500, str(e))
         except Exception as e:
             raise HTTPException(401, f"Invalid token: {e}")
 

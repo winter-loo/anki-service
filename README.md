@@ -17,11 +17,13 @@ Set `ANKI_AUTH_MODE`:
 
 - `dev_header` (default): send `X-User-Id: <user_id>` (useful for local dev)
 - `jwt`: send `Authorization: Bearer <jwt>`; verifies JWTs.
-  - Default: **RS256 + JWKS** (recommended for production)
+  - Default: **RS256 + JWKS** (recommended for production; ES256 also supported)
   - Optional: HS256 (dev/legacy)
 
 JWT-related env vars:
-- `ANKI_JWT_ALG` (default: `RS256`; options: `RS256`, `HS256`)
+- `ANKI_JWT_ALG` (default: `RS256`; options: `RS256`, `ES256`, `HS256`, `AUTO`)
+  - `AUTO` reads the token header to pick RS256/ES256 at runtime.
+  - RS256/ES256 require `cryptography` (install `PyJWT[crypto]`).
 - RS256/JWKS:
   - `ANKI_JWKS_URL` (optional) — if not set, derived as `<issuer>/.well-known/jwks.json`
   - `ANKI_JWT_ISSUER` (recommended) or `BETTER_AUTH_URL`
