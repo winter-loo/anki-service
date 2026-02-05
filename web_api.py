@@ -68,7 +68,8 @@ DEFAULT_COLLECTION_ID = os.environ.get("ANKI_DEFAULT_COLLECTION_ID", "default")
 # - SUPABASE_JWT_ISSUER (override)
 # - SUPABASE_JWKS_URL (override)
 # - SUPABASE_JWT_AUDIENCE (default: authenticated)
-JWT_ALG = (os.environ.get("ANKI_JWT_ALG") or os.environ.get("ANKI_JWT_ALG_SUPABASE") or "RS256").upper()
+# Default to AUTO so we can accept Supabase projects that use ES256 (newer) or RS256 (older).
+JWT_ALG = (os.environ.get("ANKI_JWT_ALG") or "AUTO").upper()
 # AUTO => determine RS256/ES256 from token header at runtime.
 # Useful when the issuer rotates algorithms (e.g., newer Supabase projects default to ES256).
 JWT_HS256_SECRET = os.environ.get("ANKI_JWT_HS256_SECRET")

@@ -77,6 +77,10 @@ If you prefer to run the service directly on your host machine, follow these ste
 Start the Web API using the provided helper script:
 
 ```bash
+ANKI_AUTH_MODE=supabase \
+PUBLIC_SUPABASE_URL=$(grep PUBLIC_SUPABASE_URL .env | cut -d= -f2) \
+PUBLIC_SUPABASE_PUBLISHABLE_KEY=$(grep PUBLIC_SUPABASE_PUBLISHABLE_KEY .env | cut -d= -f2) \
+SUPABASE_SECRET_KEY=$(grep SUPABASE_SECRET_KEY .env | cut -d= -f2) \
 scripts/run_web_api.sh
 ```
 
@@ -119,3 +123,11 @@ podman rm anki-service-app
 
 - [Northflank](https://northflank.com/)
 - [Google Cloud Run](https://console.cloud.google.com/cloud-build)
+
+Set environment variables listed below:
+
+- PUBLIC_SUPABASE_URL
+- PUBLIC_SUPABASE_PUBLISHABLE_KEY
+- SUPABASE_SECRET_KEY
+- ANKI_DATA_DIR
+- ANKI_AUTH_MODE
