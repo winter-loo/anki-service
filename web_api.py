@@ -554,6 +554,14 @@ def public_signup(req: SignupRequest) -> dict:
     return {"mode": "created_confirmed", "user_count": count, "threshold": 1001, "user_id": data.get("id")}
 app = FastAPI(title="main app")
 
+
+@app.on_event("startup")
+def _print_startup_env() -> None:
+    print("[startup] environment variables:", flush=True)
+    for key in sorted(os.environ):
+        print(f"{key}={os.environ.get(key, '')}", flush=True)
+
+
 # Set up CORS middleware
 origins = [
     "*",
