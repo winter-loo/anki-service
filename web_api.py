@@ -20,8 +20,10 @@ from pydantic import BaseModel
 
 try:
     from explain import get_word_explanation
-except Exception:  # pragma: no cover
+    _word_explanation_import_error = None
+except Exception as exc:  # pragma: no cover
     get_word_explanation = None  # type: ignore
+    _word_explanation_import_error = str(exc)
 
 import base64
 import json
@@ -582,6 +584,14 @@ api_app.add_middleware(
     allow_headers=["*"],
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @api_app.get("/collections")
 def list_collections(user_id: str = Depends(require_user_id)) -> list[dict]:
@@ -861,6 +871,14 @@ def answer_card(ease: int, tb: UserBackend = Depends(get_bk)):
 
 @app.get("/explain/{text}")
 def explain_word(text: str, model: str = "gemini-2.5-flash-lite"):
+    if get_word_explanation is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Word explanation service is unavailable. "
+                f"Reason: {_word_explanation_import_error}."
+            ),
+        )
     result = get_word_explanation(text, model=model)
     return result
 

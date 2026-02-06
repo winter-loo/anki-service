@@ -12,7 +12,7 @@ target
 /ui/out
 node_modules
 .env
-/tenants
+/users_data/
 /ui/web_old
 /ui/web_old_bak*
 /demo-better-auth-frontend
