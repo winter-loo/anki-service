@@ -1,0 +1,33 @@
+# syntax=docker/dockerfile:1.6
+#
+# Service image: web API on top of the Anki pylib base image.
+#
+# Build:
+#   docker build -f docker/Dockerfile.anki-pylib -t anki-pylib:local .
+#   docker build -f docker/Dockerfile.web-api --build-arg ANKI_PYLIB_IMAGE=anki-pylib:local -t anki-web-api:local .
+#
+# Run:
+#   docker run --rm -p 8000:8000 anki-web-api:local
+#
+
+ARG ANKI_PYLIB_IMAGE=anki-pylib
+FROM ${ANKI_PYLIB_IMAGE}
+
+USER root
+
+WORKDIR /app
+
+# Web API source lives at repo root currently.
+COPY web_api.py explain.py /app/
+
+RUN python -m pip install --no-cache-dir uv \
+  && uv --no-cache pip install --system \
+      fastapi python-dotenv \
+      "uvicorn[standard]" \
+      supabase google-genai \
+  && python -m pip uninstall -y uv
+
+ENV PYTHONUNBUFFERED=1
+
+EXPOSE 8000
+CMD ["uvicorn", "web_api:app", "--host", "0.0.0.0", "--port", "8000"]

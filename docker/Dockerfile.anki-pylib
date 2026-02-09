@@ -1,0 +1,73 @@
+# syntax=docker/dockerfile:1.6
+#
+# Base image: builds and installs Anki's Python layer (pylib) from an Anki git clone.
+# Intended to be used as a FROM base for services that want `import anki`.
+#
+# Build:
+#   docker build -f docker/Dockerfile.anki-pylib \
+#     --build-arg ANKI_REPO=https://github.com/ankitects/anki.git \
+#     --build-arg ANKI_REF=main \
+#     -t anki-pylib:local .
+#
+
+ARG PYTHON_VERSION=3.13
+ARG ANKI_REPO=https://github.com/ankitects/anki.git
+# Branch, tag, or commit SHA.
+ARG ANKI_REF=main
+
+FROM python:${PYTHON_VERSION}-slim-bookworm AS build
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG ANKI_REPO
+ARG ANKI_REF
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    clang \
+    cmake \
+    curl \
+    git \
+    ninja-build \
+    libssl-dev \
+    pkg-config \
+  && rm -rf /var/lib/apt/lists/*
+
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --no-modify-path
+
+WORKDIR /src
+RUN git init anki \
+  && cd anki \
+  && git remote add origin "${ANKI_REPO}" \
+  && git fetch --depth 1 origin "${ANKI_REF}" \
+  && git checkout -q FETCH_HEAD
+
+# Prevent uv from downloading its own Python; use the interpreter baked into the image.
+ENV PYTHON_BINARY=/usr/local/bin/python
+
+# Produces: out/wheels/anki-*.whl
+WORKDIR /src/anki
+RUN ./ninja wheels:anki
+
+
+FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Runtime libs for compiled Rust/Python extensions.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libsqlite3-0 \
+    libssl3 \
+    zlib1g \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /src/anki/out/wheels/anki-*.whl /tmp/
+RUN python -m pip install --no-cache-dir /tmp/anki-*.whl \
+  && rm -f /tmp/anki-*.whl
+
+RUN useradd -m -u 10001 app
+USER app
