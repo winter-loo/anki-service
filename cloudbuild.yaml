@@ -1,0 +1,35 @@
+steps:
+  # Build the Anki Python layer base image (heavy compile).
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-f"
+      - "docker/Dockerfile.anki-pylib"
+      - "-t"
+      - "${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/anki-pylib:$BUILD_ID"
+      - "."
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/anki-pylib:$BUILD_ID"
+
+  # Build the web API image on top of the base image we just pushed.
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-f"
+      - "docker/Dockerfile.web-api"
+      - "--build-arg"
+      - "ANKI_PYLIB_IMAGE=${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/anki-pylib:$BUILD_ID"
+      - "-t"
+      - "${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/anki-web-api:$BUILD_ID"
+      - "."
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/anki-web-api:$BUILD_ID"
+
+substitutions:
+  _LOCATION: "asia-northeast1"
+  _REPOSITORY: "anki"
+
