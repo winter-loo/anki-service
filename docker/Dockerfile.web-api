@@ -23,19 +23,12 @@ COPY web_api.py explain.py /app/
 
 # Download and extract the UI release into ui/out.
 RUN apt-get update && apt-get install -y --no-install-recommends curl unzip \
-  && mkdir -p /app/ui/out /tmp/ui \
-  && if [ "${UI_VERSION}" = "latest" ]; then \
-       url="https://github.com/winter-loo/memit/releases/latest/download/memit-web-dist.zip"; \
-     else \
-       tag="${UI_VERSION}"; \
-       if [ "${tag#v}" = "${tag}" ]; then tag="v${tag}"; fi; \
-       url="https://github.com/winter-loo/memit/releases/download/${tag}/memit-web-dist.zip"; \
-     fi \
-  && curl -fsSL "${url}" -o /tmp/memit-web-dist.zip \
-  && unzip -q /tmp/memit-web-dist.zip -d /tmp/ui \
-  && mv /tmp/ui/dist/* /app/ui/out/ \
-  && rm -rf /tmp/ui /tmp/memit-web-dist.zip \
-  && apt-get purge -y unzip \
+  && mkdir -p /app/ui/out \
+  && curl -fsSL "https://github.com/winter-loo/memit/releases/latest/download/memit-web-dist.zip" -o /tmp/memit-web-dist.zip \
+  && unzip -q /tmp/memit-web-dist.zip -d /tmp/ui-dist \
+  && mv /tmp/ui-dist/dist/* /app/ui/out/ \
+  && rm -rf /tmp/ui-dist /tmp/memit-web-dist.zip \
+  && apt-get purge -y unzip curl \
   && apt-get autoremove -y \
   && rm -rf /var/lib/apt/lists/*
 
