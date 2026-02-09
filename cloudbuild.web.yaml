@@ -1,0 +1,26 @@
+steps:
+  # Build the web API image, using a pre-built/published Anki base image.
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-f"
+      - "docker/Dockerfile.web-api"
+      - "--build-arg"
+      - "ANKI_PYLIB_IMAGE=${_ANKI_PYLIB_IMAGE}"
+      - "--build-arg"
+      - "UI_VERSION=${_UI_VERSION}"
+      - "-t"
+      - "${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/anki-web-api:$BUILD_ID"
+      - "."
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/anki-web-api:$BUILD_ID"
+
+substitutions:
+  _LOCATION: "asia-northeast1"
+  _REPOSITORY: "anki"
+  # Point this at an immutable base image reference (best: by digest, e.g. .../anki-pylib@sha256:...).
+  _ANKI_PYLIB_IMAGE: "asia-northeast1-docker.pkg.dev/$PROJECT_ID/anki/anki-pylib:base"
+  _UI_VERSION: "latest"
+

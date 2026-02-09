@@ -1,0 +1,33 @@
+steps:
+  # Build the Anki Python layer base image (heavy compile).
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-f"
+      - "docker/Dockerfile.anki-pylib"
+      - "--build-arg"
+      - "ANKI_REPO=${_ANKI_REPO}"
+      - "--build-arg"
+      - "ANKI_REF=${_ANKI_REF}"
+      - "-t"
+      - "${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/anki-pylib:${_BASE_TAG}"
+      - "."
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/anki-pylib:${_BASE_TAG}"
+
+options:
+  machineType: "E2_HIGHCPU_8"
+
+timeout: "7200s"
+
+substitutions:
+  _LOCATION: "asia-northeast1"
+  _REPOSITORY: "anki"
+  # Pin this to a tag/commit SHA for true immutability, otherwise "main" will drift over time.
+  _ANKI_REPO: "https://github.com/ankitects/anki.git"
+  _ANKI_REF: "main"
+  # Tag used in Artifact Registry for this base image.
+  _BASE_TAG: "base"
+
