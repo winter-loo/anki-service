@@ -12,7 +12,7 @@
 
 ARG ANKI_PYLIB_IMAGE=anki-pylib
 ARG UI_VERSION=latest
-FROM ${ANKI_PYLIB_IMAGE}
+FROM asia-northeast1-docker.pkg.dev/gen-lang-client-0344850940/anki/anki-pylib:base
 
 USER root
 
