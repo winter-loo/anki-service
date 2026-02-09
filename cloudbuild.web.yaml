@@ -24,3 +24,6 @@ substitutions:
   _ANKI_PYLIB_IMAGE: "asia-northeast1-docker.pkg.dev/$PROJECT_ID/anki/anki-pylib:base"
   _UI_VERSION: "latest"
 
+options:
+  logging: CLOUD_LOGGING_ONLY
+
