@@ -370,15 +370,15 @@
             <div class="response"></div>
         </div>
 
-        <div class="api-card" id="sched-states">
+        <div class="api-card" id="card-stats">
             <div class="api-header">
-                <div><span class="method">GET</span> <span class="path">/api/card/scheduling_states/@{card_id}</span></div>
-                <button class="btn btn-exec" onclick="callApi('/api/card/scheduling_states/@' + getVal('sched-card-id'), 'GET', 'sched-states')">Execute</button>
+                <div><span class="method">GET</span> <span class="path">/api/card/stats/@{card_id}</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/card/stats/@' + getVal('stat-card-id'), 'GET', 'card-stats')">Execute</button>
             </div>
             <div class="inputs">
                 <div class="input-group">
                     <label>card_id:</label>
-                    <input type="text" id="sched-card-id" placeholder="123456789">
+                    <input type="text" id="stat-card-id" placeholder="123456789">
                 </div>
             </div>
             <div class="response"></div>
