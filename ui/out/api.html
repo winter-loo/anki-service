@@ -345,12 +345,20 @@
         <div class="api-card" id="next-card">
             <div class="api-header">
                 <div><span class="method">GET</span> <span class="path">/api/card/next</span></div>
-                <button class="btn btn-exec" onclick="callApi('/api/card/next' + (getVal('next-card-did') ? '?deck_id=' + getVal('next-card-did') : ''), 'GET', 'next-card')">Execute</button>
+                <button class="btn btn-exec" onclick="const q = new URLSearchParams(); if(getVal('next-card-did')) q.append('deck_id', getVal('next-card-did')); if(getVal('next-card-limit')) q.append('limit', getVal('next-card-limit')); if(document.getElementById('next-card-intraday').checked) q.append('intraday_only', 'true'); callApi('/api/card/next?' + q.toString(), 'GET', 'next-card')">Execute</button>
             </div>
             <div class="inputs">
                 <div class="input-group">
                     <label>deck_id (opt):</label>
                     <input type="text" id="next-card-did" placeholder="e.g. 1">
+                </div>
+                <div class="input-group">
+                    <label>limit (opt):</label>
+                    <input type="number" id="next-card-limit" value="1" min="1" max="50">
+                </div>
+                <div class="input-group">
+                    <label>intraday_only:</label>
+                    <input type="checkbox" id="next-card-intraday">
                 </div>
             </div>
             <div class="response"></div>

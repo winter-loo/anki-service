@@ -421,10 +421,20 @@ def get_scheduled_timing_today(uc: UserCollection = Depends(get_col)):
     with uc.lock: return MessageToDict(uc.col.sched._timing_today())
 
 @api_app.get("/card/next")
-def get_next_card(deck_id: int | None = None, uc: UserCollection = Depends(get_col)):
+def get_next_card(
+    deck_id: int | None = None,
+    limit: int = 1,
+    intraday_only: bool = False,
+    uc: UserCollection = Depends(get_col)
+):
+    """Get the next card(s) for a deck. Defaults to current deck."""
     with uc.lock:
-        if deck_id is not None: uc.col.decks.select(DeckId(deck_id))
-        return MessageToDict(uc.col.sched.get_queued_cards(fetch_limit=1, intraday_learning_only=False))
+        if deck_id is not None:
+            uc.col.decks.select(DeckId(deck_id))
+        return MessageToDict(uc.col.sched.get_queued_cards(
+            fetch_limit=limit,
+            intraday_learning_only=intraday_only
+        ))
 
 @api_app.get("/card/stats/@{card_id}")
 def get_card_stats(card_id: int, uc: UserCollection = Depends(get_col)):
