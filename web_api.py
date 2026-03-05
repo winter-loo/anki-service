@@ -19,6 +19,7 @@ except Exception:  # pragma: no cover
     anki = None  # type: ignore
 
 from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from google.protobuf.json_format import MessageToDict
@@ -490,6 +491,12 @@ def ui_config() -> dict:
     return {"supabaseUrl": os.environ.get("PUBLIC_SUPABASE_URL") or "", "supabasePublishableKey": os.environ.get("PUBLIC_SUPABASE_PUBLISHABLE_KEY") or ""}
 
 app.mount("/api", api_app)
+
 UI_DIR = os.environ.get("ANKI_UI_DIR", "ui/out")
 os.makedirs(UI_DIR, exist_ok=True)
+
+@app.get("/api-lab", include_in_schema=False)
+async def api_lab():
+    return FileResponse(os.path.join(UI_DIR, "api.html"))
+
 app.mount("/", StaticFiles(directory=UI_DIR, html=True), name="ui")
