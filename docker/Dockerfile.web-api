@@ -20,6 +20,8 @@ WORKDIR /app
 
 # Web API source lives at repo root currently.
 COPY web_api.py explain.py /app/
+# Copy the API Lab UI
+COPY ui/out/api.html /app/ui/out/api.html
 
 # Download and extract the UI release into ui/out.
 RUN apt-get update && apt-get install -y --no-install-recommends curl unzip \
