@@ -664,6 +664,17 @@ def get_next_card(tb: UserBackend = Depends(get_bk)):
         return MessageToDict(qcards)
 
 
+@api_app.get("/card/scheduling_states/@{card_id}")
+def get_card_scheduling_states(card_id: int, tb: UserBackend = Depends(get_bk)):
+    with tb.lock:
+        states = tb.backend.get_scheduling_states(card_id)
+        labels = tb.backend.describe_next_states(states)
+        return {
+            "states": MessageToDict(states),
+            "labels": list(labels),
+        }
+
+
 def int_time(scale: int = 1) -> int:
     "The time in integer seconds. Pass scale=1000 to get milliseconds."
     return int(time.time() * scale)
