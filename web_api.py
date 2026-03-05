@@ -367,7 +367,7 @@ def list_notes(deck_id: int | None = None, uc: UserCollection = Depends(get_col)
     with uc.lock:
         did = DeckId(deck_id) if deck_id is not None else uc.col.decks.selected()
         ss = uc.col.build_search_string(anki.search_pb2.SearchNode(deck=uc.col.decks.name(did)))
-        note_id_list = uc.col.find_notes(ss, order="noteCrt asc")
+        note_id_list = uc.col.find_notes(ss, order="n.id asc")
         return [MessageToDict(uc.col.get_note(nid)._to_backend_note()) for nid in note_id_list]
 
 @api_app.post("/note/add/{fld}")
