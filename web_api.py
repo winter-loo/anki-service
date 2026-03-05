@@ -4,12 +4,18 @@ from __future__ import annotations
 # We keep auth-related endpoints importable even if the extension isn't built
 # (useful for lightweight auth verification tests).
 try:
-    from anki._backend import RustBackend  # type: ignore
+    from anki.collection import Collection
+    from anki.notes import NoteId
+    from anki.cards import CardId
+    from anki.decks import DeckId
     import anki.search_pb2  # type: ignore
     import anki.cards_pb2  # type: ignore
     import anki.scheduler_pb2  # type: ignore
 except Exception:  # pragma: no cover
-    RustBackend = None  # type: ignore
+    Collection = None  # type: ignore
+    NoteId = None  # type: ignore
+    CardId = None  # type: ignore
+    DeckId = None  # type: ignore
     anki = None  # type: ignore
 
 from fastapi import Depends, FastAPI, Header, HTTPException
@@ -202,30 +208,29 @@ def require_user_id(
 
 
 @dataclass
-class UserBackend:
-    backend: RustBackend
+class UserCollection:
+    col: Collection
     lock: threading.Lock
 
 
-class BackendManager:
-    """Caches a RustBackend per (user_id, collection_id) and protects SQLite access with a lock."""
+class CollectionManager:
+    """Caches a Collection per (user_id, collection_id) and protects SQLite access with a lock."""
 
     def __init__(self) -> None:
         _ensure_dir(DATA_DIR)
-        self._items: dict[tuple[str, str], UserBackend] = {}
+        self._items: dict[tuple[str, str], UserCollection] = {}
         self._guard = threading.Lock()
 
     def evict(self, user_id: str, collection_id: str) -> None:
-        """Remove a cached backend (best-effort close)."""
+        """Remove a cached collection (best-effort close)."""
         key = (str(user_id), str(collection_id))
-        tb: UserBackend | None = None
+        uc: UserCollection | None = None
         with self._guard:
-            tb = self._items.pop(key, None)
-        if tb is not None:
+            uc = self._items.pop(key, None)
+        if uc is not None:
             try:
-                with tb.lock:
-                    # close_collection expects a bool argument
-                    tb.backend.close_collection(downgrade_to_schema11=False)
+                with uc.lock:
+                    uc.col.close()
             except Exception:
                 # Best-effort: don't crash deletion paths if closing fails.
                 pass
@@ -241,38 +246,29 @@ class BackendManager:
         _ensure_dir(log_dir)
         return col_dir, collection_path, media_folder_path, media_db_path
 
-    def get(self, user_id: str, collection_id: str) -> UserBackend:
+    def get(self, user_id: str, collection_id: str) -> UserCollection:
         key = (str(user_id), str(collection_id))
         with self._guard:
             if key in self._items:
                 return self._items[key]
 
-            if RustBackend is None:
+            if Collection is None:
                 raise RuntimeError(
-                    "Anki RustBackend is not available (missing compiled extension)."
+                    "Anki Collection is not available (missing compiled extension)."
                 )
 
             col_dir, collection_path, media_folder_path, media_db_path = self._collection_paths(user_id, collection_id)
 
-            # Initialize backend per user.
-            # Logging initialization is global-ish, but we can still point it at the
-            # user's directory for easier debugging.
-            # Passing a custom log directory path can fail on some platforms/builds.
-            # Default logging setup is sufficient for the web API.
-            RustBackend.initialize_logging(None)
-            bk = RustBackend(["en"], True)
-            bk.open_collection(
-                collection_path=collection_path,
-                media_folder_path=media_folder_path,
-                media_db_path=media_db_path,
-            )
+            # Initialize collection per user.
+            # Collection(path) automatically handles media paths based on collection_path.
+            col = Collection(collection_path, server=True)
 
-            item = UserBackend(backend=bk, lock=threading.Lock())
+            item = UserCollection(col=col, lock=threading.Lock())
             self._items[key] = item
             return item
 
 
-backend_manager = BackendManager()
+collection_manager = CollectionManager()
 
 
 def require_collection_id(x_collection_id: str | None = Header(default=None)) -> str:
@@ -286,11 +282,11 @@ def require_collection_id(x_collection_id: str | None = Header(default=None)) ->
     return x_collection_id or DEFAULT_COLLECTION_ID
 
 
-def get_bk(
+def get_col(
     user_id: str = Depends(require_user_id),
     collection_id: str = Depends(require_collection_id),
-) -> UserBackend:
-    return backend_manager.get(user_id, collection_id)
+) -> UserCollection:
+    return collection_manager.get(user_id, collection_id)
 
 
 # -----------------------------
@@ -526,18 +522,18 @@ def init_collection(
     collection_id: str,
     user_id: str = Depends(require_user_id),
 ) -> dict:
-    """Force-initialize a collection by opening it via RustBackend.
+    """Force-initialize a collection by opening it via Collection.
 
     Useful to validate the environment and ensure the underlying SQLite DB files exist.
     """
     cid = _safe_id(collection_id, what="collection_id")
-    if RustBackend is None:
-        raise HTTPException(500, "Anki RustBackend is not available. Run ./build_anki first.")
+    if Collection is None:
+        raise HTTPException(500, "Anki Collection is not available. Run ./build_anki first.")
 
-    # Open/initialize backend (this will create collection.anki2 if missing)
-    tb = backend_manager.get(user_id, cid)
+    # Open/initialize collection (this will create collection.anki2 if missing)
+    uc = collection_manager.get(user_id, cid)
     # Close it again to avoid keeping too many open collections around
-    backend_manager.evict(user_id, cid)
+    collection_manager.evict(user_id, cid)
 
     col_dir = _user_collection_dir(user_id, cid)
     return {
@@ -554,10 +550,10 @@ def delete_collection(
 ) -> dict:
     """Delete a collection directory.
 
-    Best-effort closes any cached backend first.
+    Best-effort closes any cached collection first.
     """
     cid = _safe_id(collection_id, what="collection_id")
-    backend_manager.evict(user_id, cid)
+    collection_manager.evict(user_id, cid)
 
     col_dir = _user_collection_dir(user_id, cid)
     if not os.path.isdir(col_dir):
@@ -567,34 +563,63 @@ def delete_collection(
     return {"deleted": True, "collection_id": cid}
 
 
-@api_app.get("/collection/stats")
-def get_collection_stats(tb: UserBackend = Depends(get_bk)):
-    """Get high-level collection statistics: scheduler counts and database totals."""
-    with tb.lock:
-        # 1. Scheduler State (counts for the current deck)
-        # fetch_limit=0 as we only need the counts
-        qcards = tb.backend.get_queued_cards(fetch_limit=0, intraday_learning_only=False)
-
-        # 2. Collection Totals (direct DB queries as performed in pylib)
-        # note_count()
-        note_count_rows = tb.backend.db_query("select count() from notes", [], True)
-        note_count = note_count_rows[0][0] if note_count_rows else 0
-
-        # card_count()
-        card_count_rows = tb.backend.db_query("select count() from cards", [], True)
-        card_count = card_count_rows[0][0] if card_count_rows else 0
-
+@api_app.get("/collection")
+def get_collection_info(uc: UserCollection = Depends(get_col)):
+    """Get information about the current collection."""
+    with uc.lock:
         return {
-            "new_count": qcards.new_count,
-            "learning_count": qcards.learning_count,
-            "review_count": qcards.review_count,
-            "note_count": note_count,
-            "card_count": card_count,
+            "path": uc.col.path,
+            "note_count": uc.col.note_count(),
+            "card_count": uc.col.card_count(),
+            "current_deck": uc.col.decks.name(uc.col.decks.selected())
         }
+
+
+@api_app.get("/collection/stats")
+def get_collection_stats(uc: UserCollection = Depends(get_col)):
+    """Get high-level collection statistics: database totals."""
+    with uc.lock:
+        return {
+            "note_count": uc.col.note_count(),
+            "card_count": uc.col.card_count(),
+        }
+
+
+@api_app.get("/deck/stats")
+def get_deck_stats(deck_id: int | None = None, uc: UserCollection = Depends(get_col)):
+    """Get statistics for a specific deck or the current deck."""
+    with uc.lock:
+        did = DeckId(deck_id) if deck_id is not None else uc.col.decks.selected()
+        
+        # To get scheduler counts for a specific deck, we MUST select it
+        original_did = uc.col.decks.selected()
+        try:
+            if did != original_did:
+                uc.col.decks.select(did)
+            
+            counts = uc.col.sched.counts()
+            
+            # Deck specific note/card count
+            card_count = uc.col.db.scalar("select count() from cards where did=?", did)
+            note_count = uc.col.db.scalar("select count() from notes where id in (select nid from cards where did=?)", did)
+
+            return {
+                "deck_id": did,
+                "deck_name": uc.col.decks.name(did),
+                "new_count": counts[0],
+                "learning_count": counts[1],
+                "review_count": counts[2],
+                "note_count": note_count,
+                "card_count": card_count,
+            }
+        finally:
+            if did != original_did:
+                uc.col.decks.select(original_did)
 
 
 class UserNote(BaseModel):
     fields: list[str]
+    deck_id: int | None = None
 
 
 class CreateCollectionRequest(BaseModel):
@@ -602,99 +627,160 @@ class CreateCollectionRequest(BaseModel):
     name: str | None = None
 
 
+class CreateDeckRequest(BaseModel):
+    name: str
+
+
+@api_app.get("/decks")
+def list_decks(uc: UserCollection = Depends(get_col)):
+    """List all decks in the collection."""
+    with uc.lock:
+        decks = uc.col.decks.all_names_and_ids()
+        # MessageToDict works on protobuf objects
+        return [MessageToDict(d) for d in decks]
+
+
+@api_app.get("/decks/current")
+def get_current_deck(uc: UserCollection = Depends(get_col)):
+    """Get the currently selected deck."""
+    with uc.lock:
+        did = uc.col.decks.selected()
+        name = uc.col.decks.name(did)
+        return {"id": did, "name": name}
+
+
+@api_app.post("/decks")
+def create_deck(req: CreateDeckRequest, uc: UserCollection = Depends(get_col)):
+    """Create a new deck."""
+    with uc.lock:
+        # col.decks.id(name) returns existing if found, or creates new
+        did = uc.col.decks.id(req.name)
+        return {"id": did, "name": req.name}
+
+
+@api_app.post("/decks/select/{deck_id}")
+def select_deck(deck_id: int, uc: UserCollection = Depends(get_col)):
+    """Select a deck as current."""
+    with uc.lock:
+        uc.col.decks.select(DeckId(deck_id))
+        return {"selected": True, "id": deck_id}
+
+
+@api_app.delete("/decks/{deck_id}")
+def delete_deck(deck_id: int, uc: UserCollection = Depends(get_col)):
+    """Delete a deck."""
+    with uc.lock:
+        # remove() expects a sequence of deck IDs
+        uc.col.decks.remove([DeckId(deck_id)])
+        return {"deleted": True, "id": deck_id}
+
+
 @api_app.get("/note/list")
-def list_notes(tb: UserBackend = Depends(get_bk)):
-    with tb.lock:
-        deck = tb.backend.get_current_deck()
-        sn = anki.search_pb2.SearchNode(deck=deck.name)
-        ss = tb.backend.build_search_string(sn)
-        so = anki.search_pb2.SortOrder(
-            builtin=anki.search_pb2.SortOrder.Builtin(column="noteCrt")
-        )
-        note_id_list = tb.backend.search_notes(search=ss, order=so)
+def list_notes(deck_id: int | None = None, uc: UserCollection = Depends(get_col)):
+    """List notes. Optionally filter by deck_id. Defaults to current deck."""
+    with uc.lock:
+        did = DeckId(deck_id) if deck_id is not None else uc.col.decks.selected()
+        deck_name = uc.col.decks.name(did)
+        sn = anki.search_pb2.SearchNode(deck=deck_name)
+        ss = uc.col.build_search_string(sn)
+        
+        # We still use finding_notes search and sort by noteCrt
+        # find_notes(query, order="noteCrt asc")
+        note_id_list = uc.col.find_notes(ss, order="noteCrt asc")
+        
         resp = []
         for nid in note_id_list:
-            note = tb.backend.get_note(nid)
-            resp.append(MessageToDict(note))
+            note = uc.col.get_note(nid)
+            resp.append(MessageToDict(note._to_backend_note()))
         return resp
 
 
 @api_app.post("/note/add/{fld}")
-def create_note(fld: str, tb: UserBackend = Depends(get_bk)):
-    with tb.lock:
-        basic_notetype = tb.backend.get_notetype_names()[0]
-        nn = tb.backend.new_note(basic_notetype.id)
+def create_note(fld: str, deck_id: int | None = None, uc: UserCollection = Depends(get_col)):
+    with uc.lock:
+        did = DeckId(deck_id) if deck_id is not None else uc.col.decks.selected()
+        basic_notetype = uc.col.models.all_names_and_ids()[0]
+        nt = uc.col.models.get(basic_notetype.id)
+        nn = uc.col.new_note(nt)
         nn.fields[0] = fld
-        resp = tb.backend.add_note(note=nn, deck_id=tb.backend.get_current_deck().id)
-        return {"note_id": resp.note_id}
+        uc.col.add_note(nn, did)
+        return {"note_id": nn.id}
 
 
 @api_app.post("/note/add")
-def create_note_by_json(new_user_note: UserNote, tb: UserBackend = Depends(get_bk)):
-    with tb.lock:
-        basic_notetype = tb.backend.get_notetype_names()[0]
-        nn = tb.backend.new_note(basic_notetype.id)
-        # RustBackend.new_note() returns a Note object with two fields
+def create_note_by_json(new_user_note: UserNote, uc: UserCollection = Depends(get_col)):
+    with uc.lock:
+        did = DeckId(new_user_note.deck_id) if new_user_note.deck_id is not None else uc.col.decks.selected()
+        basic_notetype = uc.col.models.all_names_and_ids()[0]
+        nt = uc.col.models.get(basic_notetype.id)
+        nn = uc.col.new_note(nt)
+        # Note.fields is a list
         nn.fields[0] = new_user_note.fields[0]
         if len(new_user_note.fields) > 1:
             nn.fields[1] = new_user_note.fields[1]
         for fld in new_user_note.fields[2:]:
             nn.fields.append(fld)
-        resp = tb.backend.add_note(note=nn, deck_id=tb.backend.get_current_deck().id)
-        return {"note_id": resp.note_id}
+        uc.col.add_note(nn, did)
+        return {"note_id": nn.id}
 
 
 @api_app.post("/note/update/@{note_id}")
-def update_note_by_id(note_id: int, user_note: UserNote, tb: UserBackend = Depends(get_bk)):
-    with tb.lock:
-        note = tb.backend.get_note(note_id)
+def update_note_by_id(note_id: int, user_note: UserNote, uc: UserCollection = Depends(get_col)):
+    with uc.lock:
+        note = uc.col.get_note(NoteId(note_id))
         note.fields[0] = user_note.fields[0]
         note.fields[1] = user_note.fields[1]
-        resp = tb.backend.update_notes(notes=[note], skip_undo_entry=True)
+        resp = uc.col.update_notes([note])
         return MessageToDict(resp)
 
 
 @api_app.get("/note/@{note_id}")
-def read_note_by_id(note_id: int, tb: UserBackend = Depends(get_bk)):
-    with tb.lock:
-        note = tb.backend.get_note(note_id)
-        return MessageToDict(note)
+def read_note_by_id(note_id: int, uc: UserCollection = Depends(get_col)):
+    with uc.lock:
+        note = uc.col.get_note(NoteId(note_id))
+        return MessageToDict(note._to_backend_note())
 
 
 @api_app.post("/note/delete/@{note_id}")
-def delete_note_by_id(note_id: int, tb: UserBackend = Depends(get_bk)):
-    with tb.lock:
-        card_ids = tb.backend.cards_of_note(nid=note_id)
-        resp = tb.backend.remove_notes(note_ids=[note_id], card_ids=card_ids)
+def delete_note_by_id(note_id: int, uc: UserCollection = Depends(get_col)):
+    with uc.lock:
+        resp = uc.col.remove_notes([NoteId(note_id)])
         return MessageToDict(resp)
 
 
 @api_app.get("/note/studied_today")
-def list_notes_studied_today(tb: UserBackend = Depends(get_bk)):
-    with tb.lock:
-        resp = tb.backend.studied_today()
+def list_notes_studied_today(uc: UserCollection = Depends(get_col)):
+    with uc.lock:
+        resp = uc.col.studied_today()
         return {"msg": resp}
 
 
 @api_app.get("/card/sched_timing_today")
-def get_scheduled_timing_today(tb: UserBackend = Depends(get_bk)):
-    with tb.lock:
-        resp = tb.backend.sched_timing_today()
+def get_scheduled_timing_today(uc: UserCollection = Depends(get_col)):
+    with uc.lock:
+        # sched_timing_today is not public in Collection, 
+        # but we can use the private _timing_today if needed, 
+        # or use the public today/day_cutoff properties.
+        # However, to maintain the same API response:
+        resp = uc.col.sched._timing_today()
         return MessageToDict(resp)
 
 
 @api_app.get("/card/next")
-def get_next_card(tb: UserBackend = Depends(get_bk)):
-    with tb.lock:
-        qcards = tb.backend.get_queued_cards(fetch_limit=1, intraday_learning_only=False)
+def get_next_card(deck_id: int | None = None, uc: UserCollection = Depends(get_col)):
+    """Get the next card for a deck. Defaults to current deck."""
+    with uc.lock:
+        if deck_id is not None:
+            uc.col.decks.select(DeckId(deck_id))
+        qcards = uc.col.sched.get_queued_cards(fetch_limit=1, intraday_learning_only=False)
         return MessageToDict(qcards)
 
 
 @api_app.get("/card/scheduling_states/@{card_id}")
-def get_card_scheduling_states(card_id: int, tb: UserBackend = Depends(get_bk)):
-    with tb.lock:
-        states = tb.backend.get_scheduling_states(card_id)
-        labels = tb.backend.describe_next_states(states)
+def get_card_scheduling_states(card_id: int, uc: UserCollection = Depends(get_col)):
+    with uc.lock:
+        states = uc.col.sched.get_scheduling_states(CardId(card_id))
+        labels = uc.col.sched.describe_next_states(states)
         return {
             "states": MessageToDict(states),
             "labels": list(labels),
@@ -746,9 +832,9 @@ def rating_from_ease(ease):
 
 
 @api_app.post("/card/answer/{ease}")
-def answer_card(ease: int, tb: UserBackend = Depends(get_bk)):
-    with tb.lock:
-        qcards = tb.backend.get_queued_cards(fetch_limit=1, intraday_learning_only=False)
+def answer_card(ease: int, uc: UserCollection = Depends(get_col)):
+    with uc.lock:
+        qcards = uc.col.sched.get_queued_cards(fetch_limit=1, intraday_learning_only=False)
         if len(qcards.cards) == 0:
             return {}
         top_card = qcards.cards[0].card
@@ -759,7 +845,7 @@ def answer_card(ease: int, tb: UserBackend = Depends(get_bk)):
             rating=rating_from_ease(ease),
         )
 
-        resp = tb.backend.answer_card(answer)
+        resp = uc.col.sched.answer_card(answer)
         return MessageToDict(resp)
 
 

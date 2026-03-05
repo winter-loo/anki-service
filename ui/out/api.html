@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anki API Lab</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #f4f7f6; }
+        h1, h2, h3 { color: #2c3e50; }
+        .section { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .config-row { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+        .config-row label { flex-basis: 150px; font-weight: bold; }
+        .config-row input { flex-grow: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .api-card { border-left: 5px solid #3498db; padding: 15px; margin-bottom: 15px; background: #fafafa; border-radius: 0 4px 4px 0; }
+        .api-card.post { border-left-color: #27ae60; }
+        .api-card.delete { border-left-color: #e74c3c; }
+        .api-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .method { font-weight: bold; padding: 3px 8px; border-radius: 4px; background: #eee; font-size: 0.8em; }
+        .path { font-family: monospace; font-size: 1.1em; color: #d63384; }
+        .inputs { margin-bottom: 10px; }
+        .input-group { margin-bottom: 5px; display: flex; align-items: center; gap: 10px; }
+        .input-group label { min-width: 100px; font-size: 0.9em; }
+        .input-group input, .input-group textarea { flex-grow: 1; padding: 5px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; }
+        .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+        .btn-exec { background: #3498db; color: white; }
+        .btn-exec:hover { background: #2980b9; }
+        .api-card.post .btn-exec { background: #27ae60; }
+        .api-card.post .btn-exec:hover { background: #219150; }
+        .api-card.delete .btn-exec { background: #e74c3c; }
+        .api-card.delete .btn-exec:hover { background: #c0392b; }
+        .response { background: #2d3436; color: #dfe6e9; padding: 15px; border-radius: 4px; overflow-x: auto; font-family: monospace; font-size: 0.9em; margin-top: 10px; display: none; white-space: pre-wrap; }
+        .status { font-weight: bold; margin-bottom: 5px; }
+        .status-ok { color: #2ecc71; }
+        .status-err { color: #e74c3c; }
+    </style>
+</head>
+<body>
+
+    <h1>Anki API Lab</h1>
+
+    <div class="section" id="config">
+        <h2>1. Authentication & Headers</h2>
+        <div class="config-row">
+            <label for="host-url">Host URL:</label>
+            <input type="text" id="host-url" placeholder="http://localhost:8000 (leave empty for relative)" value="">
+        </div>
+        <div class="config-row">
+            <label for="bearer-token">Bearer Token:</label>
+            <input type="text" id="bearer-token" placeholder="Bearer eyJhbGciOiJIUzI1NiI..." value="">
+        </div>
+        <div class="config-row">
+            <label for="collection-id">X-Collection-Id:</label>
+            <input type="text" id="collection-id" placeholder="default" value="default">
+        </div>
+        <p><small>Note: Bearer token is usually obtained via Supabase auth. For local dev, you can bypass auth if you modify the server or use a dummy token if auth is disabled.</small></p>
+    </div>
+
+    <div class="section">
+        <h2>2. General API</h2>
+        
+        <div class="api-card" id="whoami">
+            <div class="api-header">
+                <div><span class="method">GET</span> <span class="path">/api/auth/whoami</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/auth/whoami', 'GET', 'whoami')">Execute</button>
+            </div>
+            <div class="response"></div>
+        </div>
+
+        <div class="api-card post" id="signup">
+            <div class="api-header">
+                <div><span class="method">POST</span> <span class="path">/api/public/signup</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/public/signup', 'POST', 'signup', {body: true})">Execute</button>
+            </div>
+            <div class="inputs">
+                <div class="input-group">
+                    <label>JSON Body:</label>
+                    <textarea rows="3" data-body>{"email": "test@example.com", "password": "password123"}</textarea>
+                </div>
+            </div>
+            <div class="response"></div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>3. Collections</h2>
+
+        <div class="api-card" id="col-info">
+            <div class="api-header">
+                <div><span class="method">GET</span> <span class="path">/api/collection</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/collection', 'GET', 'col-info')">Execute</button>
+            </div>
+            <div class="response"></div>
+        </div>
+
+        <div class="api-card" id="col-stats">
+            <div class="api-header">
+                <div><span class="method">GET</span> <span class="path">/api/collection/stats</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/collection/stats', 'GET', 'col-stats')">Execute</button>
+            </div>
+            <div class="response"></div>
+        </div>
+
+        <div class="api-card" id="list-cols">
+            <div class="api-header">
+                <div><span class="method">GET</span> <span class="path">/api/collections</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/collections', 'GET', 'list-cols')">Execute</button>
+            </div>
+            <div class="response"></div>
+        </div>
+
+        <div class="api-card post" id="create-col">
+            <div class="api-header">
+                <div><span class="method">POST</span> <span class="path">/api/collections</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/collections', 'POST', 'create-col', {body: true})">Execute</button>
+            </div>
+            <div class="inputs">
+                <div class="input-group">
+                    <label>JSON Body:</label>
+                    <textarea rows="2" data-body>{"collection_id": "my-new-col", "name": "My Collection"}</textarea>
+                </div>
+            </div>
+            <div class="response"></div>
+        </div>
+
+        <div class="api-card post" id="init-col">
+            <div class="api-header">
+                <div><span class="method">POST</span> <span class="path">/api/collections/{id}/init</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/collections/' + getVal('init-col-id') + '/init', 'POST', 'init-col')">Execute</button>
+            </div>
+            <div class="inputs">
+                <div class="input-group">
+                    <label>collection_id:</label>
+                    <input type="text" id="init-col-id" value="default">
+                </div>
+            </div>
+            <div class="response"></div>
+        </div>
+
+        <div class="api-card delete" id="delete-col">
+            <div class="api-header">
+                <div><span class="method">DELETE</span> <span class="path">/api/collections/{id}</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/collections/' + getVal('delete-col-id'), 'DELETE', 'delete-col')">Execute</button>
+            </div>
+            <div class="inputs">
+                <div class="input-group">
+                    <label>collection_id:</label>
+                    <input type="text" id="delete-col-id" value="">
+                </div>
+            </div>
+            <div class="response"></div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>4. Decks</h2>
+
+        <div class="api-card" id="list-decks">
+            <div class="api-header">
+                <div><span class="method">GET</span> <span class="path">/api/decks</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/decks', 'GET', 'list-decks')">Execute</button>
+            </div>
+            <div class="response"></div>
+        </div>
+
+        <div class="api-card" id="current-deck">
+            <div class="api-header">
+                <div><span class="method">GET</span> <span class="path">/api/decks/current</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/decks/current', 'GET', 'current-deck')">Execute</button>
+            </div>
+            <div class="response"></div>
+        </div>
+
+        <div class="api-card" id="deck-stats">
+            <div class="api-header">
+                <div><span class="method">GET</span> <span class="path">/api/deck/stats</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/deck/stats' + (getVal('deck-stats-id') ? '?deck_id=' + getVal('deck-stats-id') : ''), 'GET', 'deck-stats')">Execute</button>
+            </div>
+            <div class="inputs">
+                <div class="input-group">
+                    <label>deck_id (opt):</label>
+                    <input type="text" id="deck-stats-id" placeholder="e.g. 1">
+                </div>
+            </div>
+            <div class="response"></div>
+        </div>
+
+        <div class="api-card post" id="create-deck">
+            <div class="api-header">
+                <div><span class="method">POST</span> <span class="path">/api/decks</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/decks', 'POST', 'create-deck', {body: true})">Execute</button>
+            </div>
+            <div class="inputs">
+                <div class="input-group">
+                    <label>JSON Body:</label>
+                    <textarea rows="2" data-body>{"name": "New Deck Name"}</textarea>
+                </div>
+            </div>
+            <div class="response"></div>
+        </div>
+
+        <div class="api-card post" id="select-deck">
+            <div class="api-header">
+                <div><span class="method">POST</span> <span class="path">/api/decks/select/{id}</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/decks/select/' + getVal('select-deck-id'), 'POST', 'select-deck')">Execute</button>
+            </div>
+            <div class="inputs">
+                <div class="input-group">
+                    <label>deck_id:</label>
+                    <input type="text" id="select-deck-id" value="1">
+                </div>
+            </div>
+            <div class="response"></div>
+        </div>
+
+        <div class="api-card delete" id="delete-deck">
+            <div class="api-header">
+                <div><span class="method">DELETE</span> <span class="path">/api/decks/{id}</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/decks/' + getVal('delete-deck-id'), 'DELETE', 'delete-deck')">Execute</button>
+            </div>
+            <div class="inputs">
+                <div class="input-group">
+                    <label>deck_id:</label>
+                    <input type="text" id="delete-deck-id" value="">
+                </div>
+            </div>
+            <div class="response"></div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>5. Notes</h2>
+
+        <div class="api-card" id="list-notes">
+            <div class="api-header">
+                <div><span class="method">GET</span> <span class="path">/api/note/list</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/note/list' + (getVal('list-notes-did') ? '?deck_id=' + getVal('list-notes-did') : ''), 'GET', 'list-notes')">Execute</button>
+            </div>
+            <div class="inputs">
+                <div class="input-group">
+                    <label>deck_id (opt):</label>
+                    <input type="text" id="list-notes-did" placeholder="e.g. 1">
+                </div>
+            </div>
+            <div class="response"></div>
+        </div>
+
+        <div class="api-card" id="notes-studied">
+            <div class="api-header">
+                <div><span class="method">GET</span> <span class="path">/api/note/studied_today</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/note/studied_today', 'GET', 'notes-studied')">Execute</button>
+            </div>
+            <div class="response"></div>
+        </div>
+
+        <div class="api-card post" id="add-note-fld">
+            <div class="api-header">
+                <div><span class="method">POST</span> <span class="path">/api/note/add/{fld}</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/note/add/' + encodeURIComponent(getVal('add-note-fld-val')) + (getVal('add-note-fld-did') ? '?deck_id=' + getVal('add-note-fld-did') : ''), 'POST', 'add-note-fld')">Execute</button>
+            </div>
+            <div class="inputs">
+                <div class="input-group">
+                    <label>fld:</label>
+                    <input type="text" id="add-note-fld-val" value="Hello World">
+                </div>
+                <div class="input-group">
+                    <label>deck_id (opt):</label>
+                    <input type="text" id="add-note-fld-did" placeholder="e.g. 1">
+                </div>
+            </div>
+            <div class="response"></div>
+        </div>
+
+        <div class="api-card post" id="add-note-json">
+            <div class="api-header">
+                <div><span class="method">POST</span> <span class="path">/api/note/add</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/note/add', 'POST', 'add-note-json', {body: true})">Execute</button>
+            </div>
+            <div class="inputs">
+                <div class="input-group">
+                    <label>JSON Body:</label>
+                    <textarea rows="3" data-body>{"fields": ["Front content", "Back content"], "deck_id": null}</textarea>
+                </div>
+            </div>
+            <div class="response"></div>
+        </div>
+
+        <div class="api-card" id="get-note">
+            <div class="api-header">
+                <div><span class="method">GET</span> <span class="path">/api/note/@{note_id}</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/note/@' + getVal('get-note-id'), 'GET', 'get-note')">Execute</button>
+            </div>
+            <div class="inputs">
+                <div class="input-group">
+                    <label>note_id:</label>
+                    <input type="text" id="get-note-id" placeholder="123456789">
+                </div>
+            </div>
+            <div class="response"></div>
+        </div>
+        
+        <div class="api-card post" id="update-note">
+            <div class="api-header">
+                <div><span class="method">POST</span> <span class="path">/api/note/update/@{note_id}</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/note/update/@' + getVal('update-note-id'), 'POST', 'update-note', {body: true})">Execute</button>
+            </div>
+            <div class="inputs">
+                <div class="input-group">
+                    <label>note_id:</label>
+                    <input type="text" id="update-note-id" placeholder="123456789">
+                </div>
+                <div class="input-group">
+                    <label>JSON Body:</label>
+                    <textarea rows="2" data-body>{"fields": ["Updated Front", "Updated Back"]}</textarea>
+                </div>
+            </div>
+            <div class="response"></div>
+        </div>
+
+        <div class="api-card delete" id="delete-note">
+            <div class="api-header">
+                <div><span class="method">POST</span> <span class="path">/api/note/delete/@{note_id}</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/note/delete/@' + getVal('delete-note-id'), 'POST', 'delete-note')">Execute</button>
+            </div>
+            <div class="inputs">
+                <div class="input-group">
+                    <label>note_id:</label>
+                    <input type="text" id="delete-note-id" placeholder="123456789">
+                </div>
+            </div>
+            <div class="response"></div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>6. Cards & Scheduling</h2>
+
+        <div class="api-card" id="sched-timing">
+            <div class="api-header">
+                <div><span class="method">GET</span> <span class="path">/api/card/sched_timing_today</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/card/sched_timing_today', 'GET', 'sched-timing')">Execute</button>
+            </div>
+            <div class="response"></div>
+        </div>
+
+        <div class="api-card" id="next-card">
+            <div class="api-header">
+                <div><span class="method">GET</span> <span class="path">/api/card/next</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/card/next' + (getVal('next-card-did') ? '?deck_id=' + getVal('next-card-did') : ''), 'GET', 'next-card')">Execute</button>
+            </div>
+            <div class="inputs">
+                <div class="input-group">
+                    <label>deck_id (opt):</label>
+                    <input type="text" id="next-card-did" placeholder="e.g. 1">
+                </div>
+            </div>
+            <div class="response"></div>
+        </div>
+
+        <div class="api-card post" id="answer-card">
+            <div class="api-header">
+                <div><span class="method">POST</span> <span class="path">/api/card/answer/{ease}</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/card/answer/' + getVal('answer-ease'), 'POST', 'answer-card')">Execute</button>
+            </div>
+            <div class="inputs">
+                <div class="input-group">
+                    <label>ease (1-4):</label>
+                    <input type="number" id="answer-ease" min="1" max="4" value="3">
+                </div>
+            </div>
+            <div class="response"></div>
+        </div>
+
+        <div class="api-card" id="sched-states">
+            <div class="api-header">
+                <div><span class="method">GET</span> <span class="path">/api/card/scheduling_states/@{card_id}</span></div>
+                <button class="btn btn-exec" onclick="callApi('/api/card/scheduling_states/@' + getVal('sched-card-id'), 'GET', 'sched-states')">Execute</button>
+            </div>
+            <div class="inputs">
+                <div class="input-group">
+                    <label>card_id:</label>
+                    <input type="text" id="sched-card-id" placeholder="123456789">
+                </div>
+            </div>
+            <div class="response"></div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>7. Misc / AI</h2>
+
+        <div class="api-card" id="ui-config">
+            <div class="api-header">
+                <div><span class="method">GET</span> <span class="path">/ui-config.json</span></div>
+                <button class="btn btn-exec" onclick="callApi('/ui-config.json', 'GET', 'ui-config')">Execute</button>
+            </div>
+            <div class="response"></div>
+        </div>
+
+        <div class="api-card" id="explain">
+            <div class="api-header">
+                <div><span class="method">GET</span> <span class="path">/explain/{text}</span></div>
+                <button class="btn btn-exec" onclick="callApi('/explain/' + encodeURIComponent(getVal('explain-text')), 'GET', 'explain')})">Execute</button>
+            </div>
+            <div class="inputs">
+                <div class="input-group">
+                    <label>text:</label>
+                    <input type="text" id="explain-text" value="Anki">
+                </div>
+            </div>
+            <div class="response"></div>
+        </div>
+    </div>
+
+    <script>
+        function getVal(id) {
+            return document.getElementById(id).value;
+        }
+
+        async function callApi(path, method, cardId, options = {}) {
+            const card = document.getElementById(cardId);
+            const respDiv = card.querySelector('.response');
+            respDiv.style.display = 'block';
+            respDiv.innerHTML = 'Loading...';
+
+            const host = document.getElementById('host-url').value.replace(/\/+$/, '');
+            const bearer = document.getElementById('bearer-token').value;
+            const collectionId = document.getElementById('collection-id').value;
+
+            const fullUrl = host ? host + (path.startsWith('/') ? path : '/' + path) : path;
+
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (bearer) headers['Authorization'] = bearer.startsWith('Bearer ') ? bearer : `Bearer ${bearer}`;
+            if (collectionId) headers['X-Collection-Id'] = collectionId;
+
+            const fetchOptions = {
+                method: method,
+                headers: headers
+            };
+
+            if (options.body) {
+                const bodyText = card.querySelector('[data-body]').value;
+                try {
+                    JSON.parse(bodyText); // Validate JSON
+                    fetchOptions.body = bodyText;
+                } catch (e) {
+                    respDiv.innerHTML = `<span class="status-err">Invalid JSON Body: ${e.message}</span>`;
+                    return;
+                }
+            }
+
+            try {
+                const response = await fetch(fullUrl, fetchOptions);
+                const statusClass = response.ok ? 'status-ok' : 'status-err';
+                const statusText = `Status: ${response.status} ${response.statusText}`;
+                
+                let data;
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                    data = JSON.stringify(data, null, 2);
+                } else {
+                    data = await response.text();
+                }
+
+                respDiv.innerHTML = `<div class="status ${statusClass}">${statusText}</div>${escapeHtml(data)}`;
+            } catch (error) {
+                respDiv.innerHTML = `<div class="status status-err">Network Error</div>${escapeHtml(error.toString())}`;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
