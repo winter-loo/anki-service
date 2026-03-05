@@ -567,6 +567,32 @@ def delete_collection(
     return {"deleted": True, "collection_id": cid}
 
 
+@api_app.get("/collection/stats")
+def get_collection_stats(tb: UserBackend = Depends(get_bk)):
+    """Get high-level collection statistics: scheduler counts and database totals."""
+    with tb.lock:
+        # 1. Scheduler State (counts for the current deck)
+        # fetch_limit=0 as we only need the counts
+        qcards = tb.backend.get_queued_cards(fetch_limit=0, intraday_learning_only=False)
+
+        # 2. Collection Totals (direct DB queries as performed in pylib)
+        # note_count()
+        note_count_rows = tb.backend.db_query("select count() from notes", [], True)
+        note_count = note_count_rows[0][0] if note_count_rows else 0
+
+        # card_count()
+        card_count_rows = tb.backend.db_query("select count() from cards", [], True)
+        card_count = card_count_rows[0][0] if card_count_rows else 0
+
+        return {
+            "new_count": qcards.new_count,
+            "learning_count": qcards.learning_count,
+            "review_count": qcards.review_count,
+            "note_count": note_count,
+            "card_count": card_count,
+        }
+
+
 class UserNote(BaseModel):
     fields: list[str]
 
