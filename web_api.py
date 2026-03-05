@@ -429,7 +429,7 @@ def get_next_card(deck_id: int | None = None, uc: UserCollection = Depends(get_c
 @api_app.get("/card/scheduling_states/@{card_id}")
 def get_card_scheduling_states(card_id: int, uc: UserCollection = Depends(get_col)):
     with uc.lock:
-        states = uc.col.sched.get_scheduling_states(CardId(card_id))
+        states = uc.col._backend.get_scheduling_states(CardId(card_id))
         return {"states": MessageToDict(states), "labels": list(uc.col.sched.describe_next_states(states))}
 
 @api_app.post("/card/answer/{ease}")
