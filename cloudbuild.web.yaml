@@ -17,12 +17,29 @@ steps:
       - "push"
       - "${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/anki-web-api:$BUILD_ID"
 
+  # Deploy to Cloud Run
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: "gcloud"
+    args:
+      - "run"
+      - "deploy"
+      - "${_SERVICE_NAME}"
+      - "--image"
+      - "${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/anki-web-api:$BUILD_ID"
+      - "--region"
+      - "${_DEPLOY_REGION}"
+      - "--platform"
+      - "managed"
+      - "--quiet"
+
 substitutions:
   _LOCATION: "asia-northeast1"
   _REPOSITORY: "anki"
   # Point this at an immutable base image reference (best: by digest, e.g. .../anki-pylib@sha256:...).
   _ANKI_PYLIB_IMAGE: "asia-northeast1-docker.pkg.dev/$PROJECT_ID/anki/anki-pylib:base"
   _UI_VERSION: "latest"
+  _SERVICE_NAME: "anki-service-git"
+  _DEPLOY_REGION: "europe-west1"
 
 options:
   logging: CLOUD_LOGGING_ONLY
